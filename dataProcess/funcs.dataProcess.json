@@ -1,0 +1,1965 @@
+{
+  "generated_at": "2026-03-30T13:49:45.527124",
+  "base_url": "http://10.1.3.127:7017",
+  "provider": "openai",
+  "model": "gpt35_chat",
+  "templates_dirs": [],
+  "input_files": [
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\__init__.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\axis_pattern_validator.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\check_llm_connection.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_dollar_expression.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_excel.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_single_window.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_wrong_rule.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\demo_excel_anomaly.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\detect_height_pattern.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\diagnose_connection.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\diagnose_llm_connection.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\example_usage.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\excel_anomaly_detector.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\extract_valid_rules.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\hybrid_detector.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\integrated_debug_app.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\llm_math_rule_detector.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\math_rule_detector.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\quick_test.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\retrospective_rule_validator.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_eval.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_excel_baseline.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_io.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_mark_excel.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_normalize.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_quality.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_rules.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_suspect.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_tool.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_types.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_degeneracy_filters.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\run_math_rule_analysis.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\run_math_rule_analysis.recovered.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\simple_llm_test.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\simple_test.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\table_detector.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\table_index_llm.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\test_cleanup_verification.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\test_debug_app.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\universal_table_detector.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\utils.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\verify_old_algorithm_removed.py",
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\window_scanner.py",
+    "C:\\ML_HOME\\ExcelStudio\\ExcelStudio.py"
+  ],
+  "files": {
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\axis_pattern_validator.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\axis_pattern_validator.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化驗證器\n\nArgs:\n    window_size: 窗格大小（建議3-5）\n    use_remote: 是否使用 remote 8b（預設 True）",
+          "summary": "初始化驗證器，設置窗格大小和是否使用 remote 8b。加载配置文件，设置环境变量，并初始化组件。"
+        },
+        {
+          "name": "validate_pattern",
+          "docstring": "驗證有規律的方向\n\nArgs:\n    pattern_result_file: height_pattern_result.json 路徑\n    excel_file: Excel檔案路徑\n    \nReturns:\n    Dict: 驗證結果",
+          "summary": "驗證有規律的方向，包括讀取 pattern 結果、確定要驗證的方向、讀取 Excel 檔案、偵測表格，並根據 axis 進行窗格掃描和驗證。"
+        },
+        {
+          "name": "_validate_axis0",
+          "docstring": "驗證 axis=0（行方向）的規律\n\nArgs:\n    df: DataFrame\n    llm_analysis: LLM 分析結果\n    \nReturns:\n    Dict: 驗證結果",
+          "summary": "驗證行方向（axis=0）的規律，包括掃描行、提取窗格、檢查數值等步驟，並使用LLM分析結果進行規律檢測。"
+        },
+        {
+          "name": "_validate_axis1",
+          "docstring": "驗證 axis=1（列方向）的規律\n\nArgs:\n    df: DataFrame\n    llm_analysis: LLM 分析結果\n    \nReturns:\n    Dict: 驗證結果",
+          "summary": "該函數的目的是驗證 DataFrame 中 axis=1（列方向）的規律。"
+        },
+        {
+          "name": "_load_pattern_result",
+          "docstring": "載入 pattern 結果",
+          "summary": "該函數的目的是載入指定的 pattern 檔案，並返回其結果作為字典。"
+        },
+        {
+          "name": "save_result",
+          "docstring": "保存驗證結果",
+          "summary": "保存驗證結果到指定檔案，如果驗證成功則儲存結果，否則顯示錯誤訊息。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主函數，用於執行 Axis 方向規律驗證器，並顯示驗證結果的摘要和統計信息。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\check_llm_connection.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\check_llm_connection.py",
+      "functions": [
+        {
+          "name": "_build_chat_payload",
+          "docstring": "",
+          "summary": "該函數的目的是構建聊天載荷，返回一個包含提供者、模型等信息的字典。"
+        },
+        {
+          "name": "check_textprocessor_chat",
+          "docstring": "",
+          "summary": "此函數的目的是檢查與文本處理器的聊天連接。它會檢查服務的健康狀態，並發送聊天請求以確保連接正常。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "這個函數的目的是檢查文本處理器的連接，如果連接失敗則引發系統退出。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_dollar_expression.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_dollar_expression.py",
+      "functions": [
+        {
+          "name": "test_dollar_expression",
+          "docstring": "測試$符號表達式評估",
+          "summary": "測試$符號表達式評估。"
+        },
+        {
+          "name": "test_equation_sides_validation",
+          "docstring": "測試equation_sides驗證",
+          "summary": "測試函數的目的是驗證equation_sides。"
+        },
+        {
+          "name": "test_correct_rules",
+          "docstring": "測試正確的規則",
+          "summary": "測試正確的規則。這個函數用於測試數據是否符合正確的規則。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_excel.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_excel.py",
+      "functions": [
+        {
+          "name": "debug_excel_file",
+          "docstring": "診斷Excel檔案內容",
+          "summary": "這個函數的目的是診斷Excel檔案的內容，包括讀取檔案、顯示工作表資訊、檢查數據類型、檢查非數字內容、檢查缺失值比例等。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是診斷測試檔案，對於指定的Excel檔案進行除錯。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_single_window.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_single_window.py",
+      "functions": [
+        {
+          "name": "_resolve_excel_path",
+          "docstring": "",
+          "summary": "這個函數的目的是解析Excel文件的路徑。如果Excel文件路徑不是絕對路徑，則會基於當前文件的父目錄來解析。"
+        },
+        {
+          "name": "_pick_window",
+          "docstring": "",
+          "summary": "此函數根據給定的視窗ID或起始行列位置，在給定的視窗列表中選擇並返回對應的視窗字典。"
+        },
+        {
+          "name": "_print_window_info",
+          "docstring": "",
+          "summary": "該函數的目的是打印窗口信息，包括窗口ID、Excel範圍、形狀、位置等。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "這個函數的目的是用於調試單個窗口以進行數學規則檢測。它接受命令行參數，解析 Excel 文件並執行表格檢測和數據提取操作。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_wrong_rule.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\debug_wrong_rule.py",
+      "functions": [
+        {
+          "name": "test_wrong_rule_validation",
+          "docstring": "測試錯誤規則的驗證",
+          "summary": "測試錯誤規則的驗證。"
+        },
+        {
+          "name": "test_rule_text_matching",
+          "docstring": "測試規則文字匹配",
+          "summary": "測試規則文字匹配的功能旨在測試規則文字的正規化和匹配條件。"
+        },
+        {
+          "name": "main",
+          "docstring": "主測試函數",
+          "summary": "該函數的目的是作為主測試函數，用於調試錯誤規則的驗證問題。在函數中列出可能的問題原因和建議檢查項目。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\demo_excel_anomaly.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\demo_excel_anomaly.py",
+      "functions": [
+        {
+          "name": "demo_excel_anomaly_detection",
+          "docstring": "Demonstrate Excel anomaly detection functionality",
+          "summary": "展示Excel异常检测功能。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\detect_height_pattern.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\detect_height_pattern.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化偵測器\n\nArgs:\n    provider: TextProcessor provider (如果為None則從config.json讀取)\n    model: TextProcessor model alias (如果為None則從config.json讀取)",
+          "summary": "初始化偵測器，根據提供者和模型設定來設置偵測器的屬性，如果未提供則從config.json中讀取。"
+        },
+        {
+          "name": "_load_prompt_template",
+          "docstring": "載入 prompt 模板",
+          "summary": "該函數的目的是載入提示模板，用於高度模式檢測。"
+        },
+        {
+          "name": "analyze_excel_file",
+          "docstring": "分析Excel檔案中的高度規律\n\nArgs:\n    excel_file: Excel檔案路徑\n    \nReturns:\n    Dict: 分析結果",
+          "summary": "這個函數的目的是分析Excel檔案中的高度規律。"
+        },
+        {
+          "name": "_analyze_with_llm",
+          "docstring": "使用LLM分析高度規律\n\nArgs:\n    axis0_data: 行數據\n    axis1_data: 列數據\n    \nReturns:\n    Dict: LLM分析結果",
+          "summary": "使用LLM分析高度规律。接受行数据和列数据，返回LLM分析结果。"
+        },
+        {
+          "name": "_format_data_for_prompt",
+          "docstring": "格式化數據供LLM使用\n\nArgs:\n    data: 數據列表\n    \nReturns:\n    str: 格式化後的字符串",
+          "summary": "該函數的目的是將數據格式化為LLM使用的字符串。"
+        },
+        {
+          "name": "_extract_json_from_response",
+          "docstring": "從LLM回應中提取JSON部分\n\nArgs:\n    content: LLM回應字符串\n    \nReturns:\n    Optional[str]: JSON字符串",
+          "summary": "這個函數的目的是從LLM回應中提取JSON部分。它接受LLM回應字符串作為參數，返回提取的JSON字符串。"
+        },
+        {
+          "name": "save_result",
+          "docstring": "保存分析結果\n\nArgs:\n    result: 分析結果\n    output_file: 輸出檔案路徑\n    \nReturns:\n    str: 保存的檔案路徑",
+          "summary": "這個函數的目的是保存分析結果到指定的檔案路徑。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主函數，用於執行高度規律偵測器的分析，並顯示分析結果。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\diagnose_connection.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\diagnose_connection.py",
+      "functions": [
+        {
+          "name": "test_basic_connectivity",
+          "docstring": "測試基本網路連線",
+          "summary": "測試基本網路連線，包括解析URL、建立TCP連線，並返回連線測試結果。"
+        },
+        {
+          "name": "test_http_methods",
+          "docstring": "測試不同的HTTP方法",
+          "summary": "測試不同的HTTP方法。"
+        },
+        {
+          "name": "test_different_models",
+          "docstring": "測試不同的模型名稱",
+          "summary": "該函數的目的是測試不同的模型名稱，並向指定的API端點發送POST請求，檢查回應狀態碼和處理回應數據。"
+        },
+        {
+          "name": "test_alternative_endpoints",
+          "docstring": "測試替代的API端點",
+          "summary": "測試替代的API端點，對不同的端點進行簡單的POST請求測試，並輸出結果。"
+        },
+        {
+          "name": "main",
+          "docstring": "主診斷函數",
+          "summary": "該函數的目的是進行本地LLM連線問題的詳細診斷，包括基本連線測試、HTTP方法測試、模型測試和替代端點測試。如果測試失敗，會提供相應的建議。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\diagnose_llm_connection.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\diagnose_llm_connection.py",
+      "functions": [
+        {
+          "name": "test_local_llm",
+          "docstring": "測試地端LLM連接",
+          "summary": "該函數的目的是測試地端LLM連接。"
+        },
+        {
+          "name": "test_openai",
+          "docstring": "測試OpenAI連接",
+          "summary": "測試OpenAI連接。"
+        },
+        {
+          "name": "suggest_fixes",
+          "docstring": "建議修復方案",
+          "summary": "該函數的目的是提供建議修復方案，包括地端LLM修復方案、環境變數設定以及快速解決方案。"
+        },
+        {
+          "name": "create_fixed_detector",
+          "docstring": "創建修復版本的偵測器",
+          "summary": "該函數的目的是創建修復版本的偵測器，並提供建議使用地端LLM端點或OpenAI API。"
+        },
+        {
+          "name": "main",
+          "docstring": "主程式",
+          "summary": "該函數的目的是作為主程式，用於LLM連接診斷工具，顯示當前環境變數並執行測試和提供建議。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\example_usage.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\example_usage.py",
+      "functions": [
+        {
+          "name": "run_command",
+          "docstring": "執行命令並顯示結果",
+          "summary": "執行命令並顯示結果。"
+        },
+        {
+          "name": "main",
+          "docstring": "主程式",
+          "summary": "該函數的目的是作為主程式，展示如何使用不同參數運行數學規則偵測器，並提供多個範例以展示不同的運行方式。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\excel_anomaly_detector.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\excel_anomaly_detector.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化異常偵測器",
+          "summary": "初始化Excel異常偵測器，設定規則檔案、窗格大小、LLM API URL、LLM模型名稱、OpenAI API金鑰和中文字體路徑。"
+        },
+        {
+          "name": "_find_chinese_font",
+          "docstring": "尋找中文字體",
+          "summary": "這個函數的目的是尋找中文字體，它會檢查預定義的中文字體路徑，並返回找到的中文字體路徑。如果找不到中文字體，則會返回None。"
+        },
+        {
+          "name": "_load_rules",
+          "docstring": "載入驗證規則",
+          "summary": "該函數的目的是載入驗證規則。"
+        },
+        {
+          "name": "load_excel_data",
+          "docstring": "載入Excel數據",
+          "summary": "載入Excel數據的功能。"
+        },
+        {
+          "name": "_is_numeric_data_area",
+          "docstring": "判斷窗格是否包含數值數據區域（更嚴格的條件）",
+          "summary": "該函數的目的是判斷窗格是否包含數值數據區域，並使用更嚴格的條件來確定數值數據的比例必須超過70％，並且文字數量不能太多。"
+        },
+        {
+          "name": "create_windows",
+          "docstring": "將DataFrame分割成窗格，優先處理數值數據區域",
+          "summary": "將DataFrame分割成窗格，優先處理數值數據區域。"
+        },
+        {
+          "name": "prepare_llm_prompt",
+          "docstring": "準備LLM提示，使用已設定有意義index的子DataFrame",
+          "summary": "準備LLM提示，使用已設定有意義index的子DataFrame。該函數將子DataFrame轉換為易讀格式，提供Excel數據驗證專家檢查數據表格中的異常的提示。"
+        },
+        {
+          "name": "call_local_llm",
+          "docstring": "呼叫本地LLM",
+          "summary": "這個函數的目的是呼叫本地LLM模型，並返回其回應。"
+        },
+        {
+          "name": "call_openai",
+          "docstring": "呼叫OpenAI API",
+          "summary": "呼叫OpenAI API。"
+        },
+        {
+          "name": "_validate_anomaly_location",
+          "docstring": "驗證異常位置是否為有效的數值數據",
+          "summary": "驗證異常位置是否為有效的數值數據。"
+        },
+        {
+          "name": "parse_llm_response",
+          "docstring": "解析LLM回應，返回包含位置和違反規則的詳細信息，並進行二次驗證",
+          "summary": "解析LLM回應，返回包含位置和違反規則的詳細信息，並進行二次驗證。"
+        },
+        {
+          "name": "convert_to_global_coords",
+          "docstring": "將窗格內座標轉換為全域座標，保留規則信息",
+          "summary": "將窗格內座標轉換為全域座標，保留規則信息。"
+        },
+        {
+          "name": "detect_anomalies",
+          "docstring": "偵測異常",
+          "summary": "這個函數的目的是偵測Excel文件中的異常數據。"
+        },
+        {
+          "name": "_summarize_rule_violations",
+          "docstring": "統計違反規則的摘要",
+          "summary": "這個函數的目的是統計違反規則的摘要。"
+        },
+        {
+          "name": "visualize_anomalies",
+          "docstring": "視覺化異常位置，包含規則編號 - 始終顯示完整的原始表格",
+          "summary": "該函數的目的是視覺化異常位置，包括規則編號，並始終顯示完整的原始表格。"
+        },
+        {
+          "name": "_is_in_data_area",
+          "docstring": "檢查座標是否在數據區域內",
+          "summary": "檢查座標是否在數據區域內，使用窗格檢查數據區域的邏輯。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "這個函數的目的是建立一個Excel數據異常偵測器，可以指定Excel文件路徑、窗格大小、使用OpenAI或本地LLM、輸出目錄等參數，並進行數據異常偵測。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\extract_valid_rules.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\extract_valid_rules.py",
+      "functions": [
+        {
+          "name": "extract_valid_rules_from_observed",
+          "docstring": "從observed.json中提取所有驗證有效的規則\n\nArgs:\n    observed_file: observed.json檔案路徑\n    \nReturns:\n    List[str]: 有效規則的equation列表",
+          "summary": "從observed.json中提取所有驗證有效的規則。這個函數會讀取observed.json檔案，並返回有效規則的equation列表。"
+        },
+        {
+          "name": "extract_valid_rules_by_center_row",
+          "docstring": "按center_row分組提取有效規則\n\nArgs:\n    observed_file: observed.json檔案路徑\n    \nReturns:\n    Dict[str, List[str]]: 按center_row分組的有效規則",
+          "summary": "提取有效规则，按center_row分组。"
+        },
+        {
+          "name": "save_valid_rules_json",
+          "docstring": "保存有效規則到JSON檔案\n\nArgs:\n    valid_rules: 有效規則列表\n    output_file: 輸出檔案路徑",
+          "summary": "這個函數的目的是將有效規則保存到一個 JSON 檔案中。函數接受有效規則列表和輸出檔案路徑作為參數，將有效規則以 JSON 格式保存到指定檔案中。"
+        },
+        {
+          "name": "save_rules_by_center_row_json",
+          "docstring": "保存按center_row分組的有效規則到JSON檔案\n\nArgs:\n    rules_by_center_row: 按center_row分組的規則\n    output_file: 輸出檔案路徑",
+          "summary": "這個函數的目的是將按照 center_row 分組的有效規則保存到 JSON 檔案中。接受兩個參數，rules_by_center_row 為按 center_row 分組的規則，output_file 為輸出檔案的路徑。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "這個函數的目的是從observed.json中提取驗證有效的數學規則，可以按照center_row分組輸出並且顯示詳細的規則資訊。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\hybrid_detector.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\hybrid_detector.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "",
+          "summary": "初始化HybridTableDetector类的构造函数，创建一个TableDetector实例并将其分配给llm_detector属性。"
+        },
+        {
+          "name": "detect_known_format",
+          "docstring": "偵測已知格式的表格（如correct_simple.xlsx）",
+          "summary": "該函數的目的是偵測已知格式的表格，如correct_simple.xlsx。它會讀取Excel文件，檢查是否符合特定格式，如果符合則返回相應的表格描述信息，否則使用LLM進行偵測。"
+        },
+        {
+          "name": "_is_correct_simple_format",
+          "docstring": "檢查是否符合correct_simple.xlsx格式",
+          "summary": "檢查DataFrame是否符合correct_simple.xlsx格式，條件包括基本尺寸檢查和數字區域檢查。"
+        },
+        {
+          "name": "extract_dataframes",
+          "docstring": "提取DataFrame",
+          "summary": "該函數的目的是從Excel文件中提取DataFrame。"
+        },
+        {
+          "name": "main",
+          "docstring": "測試混合偵測器",
+          "summary": "測試混合偵測器，使用混合表格偵測器來偵測Excel檔案中的表格，並提取相關資訊和DataFrame。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\integrated_debug_app.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\integrated_debug_app.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化偵錯應用程式",
+          "summary": "初始化偵錯應用程式，設定初始參數並載入必要資源，包括規則檔案、API 金鑰、日誌和字體設定。"
+        },
+        {
+          "name": "_find_chinese_font",
+          "docstring": "尋找中文字體",
+          "summary": "尋找中文字體的功能。"
+        },
+        {
+          "name": "_load_discovered_rules",
+          "docstring": "載入已發現的規則",
+          "summary": "該函數的目的是載入已發現的規則。"
+        },
+        {
+          "name": "detect_data_ranges",
+          "docstring": "偵測數據範圍",
+          "summary": "這個函數的目的是偵測數據範圍，通過窗格掃描方式來檢查數據區域是否為數值數據區域，並提取相應的數據範圍信息。"
+        },
+        {
+          "name": "_is_numeric_data_area",
+          "docstring": "判斷窗格是否包含數值數據區域",
+          "summary": "該函數的目的是判斷窗格是否包含數值數據區域。"
+        },
+        {
+          "name": "match_row_indices",
+          "docstring": "透過相似度計算匹配行索引",
+          "summary": "這個函數的目的是透過相似度計算來匹配行索引。"
+        },
+        {
+          "name": "validate_data_with_rules",
+          "docstring": "使用規則驗證目標數據",
+          "summary": "使用規則驗證目標數據。"
+        },
+        {
+          "name": "_find_matching_rules",
+          "docstring": "尋找匹配的規則",
+          "summary": "尋找匹配的規則，根據給定的行名稱和規則來找出符合的規則。"
+        },
+        {
+          "name": "_validate_with_rule",
+          "docstring": "使用特定規則驗證數據",
+          "summary": "使用特定规则验证数据。"
+        },
+        {
+          "name": "_prepare_validation_prompt",
+          "docstring": "準備驗證提示",
+          "summary": "該函數的目的是準備驗證提示，用於檢查數據表格中的異常，並根據已知的數學規則進行驗證。"
+        },
+        {
+          "name": "_call_openai",
+          "docstring": "呼叫OpenAI API",
+          "summary": "呼叫OpenAI API。"
+        },
+        {
+          "name": "_call_local_llm",
+          "docstring": "呼叫本地LLM",
+          "summary": "該函數的目的是呼叫本地LLM，接收一個提示並返回相應的回應。"
+        },
+        {
+          "name": "_parse_validation_response",
+          "docstring": "解析驗證回應",
+          "summary": "該函數的目的是解析驗證回應，清理回應文字並提取JSON格式的數據，最終返回包含特定格式的字典列表。"
+        },
+        {
+          "name": "visualize_results",
+          "docstring": "視覺化驗證結果",
+          "summary": "該函數的目的是視覺化驗證結果，根據輸入的數據框和異常位置字典，繪製相應的表格，突出異常位置。"
+        },
+        {
+          "name": "run_debug_analysis",
+          "docstring": "執行完整的偵錯分析",
+          "summary": "執行完整的偵錯分析，包括載入目標數據、偵測數據範圍、驗證數據並儲存結果。"
+        },
+        {
+          "name": "_prepare_json_results",
+          "docstring": "準備JSON序列化的結果",
+          "summary": "準備JSON序列化的結果，將tuple轉換為list。"
+        },
+        {
+          "name": "main",
+          "docstring": "主程式",
+          "summary": "該函數的目的是作為主程式，用於整合偵錯應用程式。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\llm_math_rule_detector.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\llm_math_rule_detector.py",
+      "functions": [
+        {
+          "name": "is_dollar_expr",
+          "docstring": "Quick check for allowed token characters in $(a,b) / $i expressions.",
+          "summary": "該函數用於快速檢查在$(a,b)/ $i表達式中允許的令牌字符。"
+        },
+        {
+          "name": "_detect_with_local_llm",
+          "docstring": "使用TextProcessor服務偵測",
+          "summary": "使用TextProcessor服務來偵測數學規律。"
+        },
+        {
+          "name": "__init__",
+          "docstring": "初始化偵測器\n\nArgs:\n    prefer_local: 是否優先使用TextProcessor服務\n    openai_model: OpenAI模型名稱（預設: gpt35_chat",
+          "summary": "初始化偵測器，設定是否優先使用TextProcessor服務和OpenAI模型名稱。"
+        },
+        {
+          "name": "_init_clients",
+          "docstring": "初始化LLM客戶端",
+          "summary": "初始化LLM客戶端。"
+        },
+        {
+          "name": "_load_prompts",
+          "docstring": "載入提示模板",
+          "summary": "該函數的目的是載入數學規律偵測的提示模板。"
+        },
+        {
+          "name": "_normalize_matrix_inputs",
+          "docstring": "Normalize inputs into a 2D matrix with row/column names.",
+          "summary": "將輸入規範化為帶有行/列名稱的二維矩陣。"
+        },
+        {
+          "name": "_count_numeric_cells",
+          "docstring": "",
+          "summary": "這個函數的目的是計算矩陣中的數值單元格數量。"
+        },
+        {
+          "name": "detect_math_rules",
+          "docstring": "偵測數值之間的數學規律\n\nArgs:\n    values: 數值列表\n    column_names: 對應的欄位名稱\n    use_openai: 是否強制使用OpenAI\n    \nReturns:\n    Dict: 偵測結果",
+          "summary": "該函數的目的是偵測數值之間的數學規律，根據提供的數值列表進行分析，並返回偵測結果。"
+        },
+        {
+          "name": "detect_math_rules_batch",
+          "docstring": "Batch detect math rules via TextProcessor /chat/batch.\n\nArgs:\n    batch_items: [{'values': [...], 'index_names': [...]}...]\n    use_openai: route through TextProcessor OpenAI provider\n    batch_size: chunk size for each /chat/batch request\n\nReturns:\n    List[Optional[Dict]] aligned with input order.",
+          "summary": "這個函數的目的是通過TextProcessor /chat/batch 批量檢測數學規則。接受批量項目作為輸入，並返回與輸入順序對應的結果列表。"
+        },
+        {
+          "name": "_detect_with_textprocessor",
+          "docstring": "",
+          "summary": "此函數使用文本處理器檢測數學規則。"
+        },
+        {
+          "name": "_detect_with_openai",
+          "docstring": "使用TextProcessor的OpenAI API偵測",
+          "summary": "使用TextProcessor的OpenAI API來偵測數學規律。"
+        },
+        {
+          "name": "_split_equation",
+          "docstring": "",
+          "summary": "這個函數的目的是將方程式分成左右兩部分。如果方程式為空或不包含等號，則返回None；否則返回去除空格後的左右兩部分。"
+        },
+        {
+          "name": "_normalize_index_tokens",
+          "docstring": "Normalize index tokens into $(a,b) form.",
+          "summary": "將索引標記規範化為$(a,b)形式。"
+        },
+        {
+          "name": "_normalize_equation_sides",
+          "docstring": "讓每條規則都有可驗證的 equation_sides（$(a,b) 形式）\n優先：有效的 equation_sides -> 若無，從 equation 轉 -> 再不行，用欄位名映射替換",
+          "summary": "此函數的目的是確保每個規則都有可驗證的等式兩側（$(a,b)形式）。首先檢查是否有有效的等式兩側，如果沒有，則從等式中提取；如果仍無法獲得，則使用欄位名映射替換。"
+        },
+        {
+          "name": "_parse_llm_response",
+          "docstring": "解析LLM回應",
+          "summary": "該函數的目的是解析LLM回應，清理回應內容並嘗試解析JSON格式的內容，同時修復常見的JSON解析問題。"
+        },
+        {
+          "name": "_validate_result",
+          "docstring": "驗證結果格式",
+          "summary": "該函數的目的是驗證結果的格式，確保包含必要欄位並進行必要的補充。"
+        },
+        {
+          "name": "_verify_equation_sides",
+          "docstring": "驗證equation_sides格式的數學正確性\n\nArgs:\n    equation_sides: 等式兩邊，如 [\"$(0,0) + $(0,1)\", \"$(1,0)\"]\n    values: 數值矩陣（rows x cols）\n    \nReturns:\n    bool: 是否數學正確",
+          "summary": "該函數的目的是驗證 equation_sides 格式的數學正確性，接受等式兩邊和數值矩陣作為輸入，返回一個布爾值以指示是否數學正確。"
+        },
+        {
+          "name": "_equation_sides_in_range",
+          "docstring": "檢查 equation_sides 中所有索引是否在 values 的範圍內。",
+          "summary": "檢查 equation_sides 中所有索引是否在 values 的範圍內。"
+        },
+        {
+          "name": "_evaluate_dollar_expression",
+          "docstring": "評估$符號表達式的值\n\nArgs:\n    expression: 如 \"$(0,0) + $(1,0)\" 或 \"$(0,1)\"\n    values: 數值矩陣（rows x cols）\n    \nReturns:\n    float: 計算結果",
+          "summary": "該函數的目的是評估$符號表達式的值，接受一個表達式和數值矩陣，返回計算結果。"
+        },
+        {
+          "name": "_safe_eval_math_expression_simple",
+          "docstring": "安全地評估數學表達式（簡化版）\n\nArgs:\n    expression: 數學表達式，如 \"237.6 + 1.2\"\n    \nReturns:\n    float: 計算結果",
+          "summary": "這個函數的目的是安全地評估數學表達式（簡化版），接受一個數學表達式並返回計算結果。該函數只允許數字、小數點、基本運算符、括號和空格，並使用eval函數進行計算。"
+        },
+        {
+          "name": "validate_rules",
+          "docstring": "驗證偵測到的規律是否正確，支援新的math_expression格式\n\nArgs:\n    values: 原始數值矩陣\n    rules: 偵測到的規律列表\n    \nReturns:\n    Dict: 驗證結果",
+          "summary": "驗證偵測到的規律是否正確，支援新的math_expression格式。接受原始數值矩陣和偵測到的規律列表作為參數，返回驗證結果的字典。"
+        },
+        {
+          "name": "_verify_equation_mathematically",
+          "docstring": "數學驗證等式是否正確\n\nArgs:\n    equation_with_values: 包含數值的等式，如 \"7.0 = 2.5 - 224.4\"\n    \nReturns:\n    Tuple[bool, float, str]: (是否正確, 計算結果, 錯誤信息)",
+          "summary": "該函數的目的是數學驗證包含數值的等式是否正確。"
+        },
+        {
+          "name": "_safe_eval_math_expression",
+          "docstring": "安全地評估數學表達式\n\nArgs:\n    expression: 數學表達式字符串\n    \nReturns:\n    float: 計算結果",
+          "summary": "這個函數的目的是安全地評估數學表達式，只允許數字、小數點、基本運算符和空格，並返回計算結果。"
+        },
+        {
+          "name": "_contains_chinese_or_field_names",
+          "docstring": "檢查文本是否包含中文字符或欄位名稱\n\nArgs:\n    text: 要檢查的文本\n    \nReturns:\n    bool: 是否包含中文或欄位名稱",
+          "summary": "此函數的目的是檢查文本是否包含中文字符或欄位名稱。"
+        },
+        {
+          "name": "_coerce_equation_sides_from_equation",
+          "docstring": "若缺少 equation_sides、但 rule['equation'] 形如 \"$(0,0) + $(0,1) = $(1,0)\"，則自動補上：\nequation_sides = [\"$(0,0) + $(0,1)\", \"$(1,0)\"]",
+          "summary": "如果缺少equation_sides，但rule['equation']形如\"$(0,0)+ $(0,1)= $(1,0)\"，则自动补上equation_sides=[\"$(0,0)+ $(0,1)\",\"$(1,0)\"]。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主函數，用於LLM數學規律偵測器的操作。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\math_rule_detector.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\math_rule_detector.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "",
+          "summary": "這個函數的目的是初始化一個MathRule物件，並設定其ID和eval_string屬性。"
+        },
+        {
+          "name": "execute",
+          "docstring": "",
+          "summary": "這個函數的目的是執行傳入的數學運算式，並返回計算結果。"
+        },
+        {
+          "name": "__init__",
+          "docstring": "初始化偵測器\n\nArgs:\n    window_shape: 窗格形狀 (height, width)，預設為 (5, 1)",
+          "summary": "該函數的目的是初始化偵測器，設定窗格形狀和相關API金鑰，並建立客戶端和日誌。"
+        },
+        {
+          "name": "load_excel_data",
+          "docstring": "載入Excel數據",
+          "summary": "載入Excel數據，根據檔案路徑和工作表名稱（可選）載入數據，並返回DataFrame。"
+        },
+        {
+          "name": "extract_numeric_patterns",
+          "docstring": "提取數值模式",
+          "summary": "提取數值模式。"
+        },
+        {
+          "name": "load_prompt_template",
+          "docstring": "載入提示詞模板",
+          "summary": "該函數的目的是載入數學規則檢測的提示詞模板，並返回一個包含系統提示和用戶提示的字典。"
+        },
+        {
+          "name": "generate_rule_prompt",
+          "docstring": "生成規則識別提示詞",
+          "summary": "生成規則識別提示詞。"
+        },
+        {
+          "name": "test_local_llm_connection",
+          "docstring": "測試地端LLM連接（參考check_llm_connection.py）",
+          "summary": "測試地端LLM連接，檢查基本連線是否成功，並確認指定模型是否存在。"
+        },
+        {
+          "name": "call_llm",
+          "docstring": "呼叫語言模型（參考check_llm_connection.py的方法）",
+          "summary": "該函數的目的是呼叫語言模型，用於分析數值之間的線性關係。"
+        },
+        {
+          "name": "parse_llm_response",
+          "docstring": "解析LLM回應",
+          "summary": "該函數的目的是解析LLM回應，首先嘗試解析整個回應，然後嘗試提取JSON陣列部分並解析。如果解析失敗，則嘗試修復常見問題並再次解析。"
+        },
+        {
+          "name": "verify_rule",
+          "docstring": "驗證數學規則",
+          "summary": "該函數的目的是驗證數學規則，接受一組值和係數，並計算它們的線性組合，最後檢查結果是否在容差範圍內。"
+        },
+        {
+          "name": "analyze_patterns",
+          "docstring": "分析數據模式",
+          "summary": "分析數據模式，載入Excel數據並提取數值模式，生成提示詞並呼叫LLM進行規則驗證。"
+        },
+        {
+          "name": "save_results",
+          "docstring": "保存結果到JSON文件",
+          "summary": "該函數的目的是將結果保存到JSON文件中。"
+        },
+        {
+          "name": "main",
+          "docstring": "主程式",
+          "summary": "這個主程式是數學規則偵測器的主要功能，用於分析Excel文件中的數學模式並生成摘要結果。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\quick_test.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\quick_test.py",
+      "functions": [
+        {
+          "name": "quick_test",
+          "docstring": "快速測試主要功能",
+          "summary": "快速測試主要功能是測試數學規律偵測器、窗格掃描器和表格偵測器。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\retrospective_rule_validator.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\retrospective_rule_validator.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "",
+          "summary": "初始化RetrospectiveRuleValidator类的构造函数，创建LLMMathRuleDetector实例。"
+        },
+        {
+          "name": "validate_rules_retrospectively",
+          "docstring": "對每個center_row進行回溯式規則驗證\n\nArgs:\n    center_row_groups: 按center_row分組的窗格結果\n    \nReturns:\n    Dict: 回溯驗證後的結果",
+          "summary": "該函數的目的是對每個中心行進行回溯式規則驗證，接受按中心行分組的窗格結果，並返回回溯驗證後的結果。"
+        },
+        {
+          "name": "_collect_all_rules_in_center_row",
+          "docstring": "收集center_row中所有出現過的規則",
+          "summary": "收集center_row中所有出現過的規則。"
+        },
+        {
+          "name": "_validate_all_rules_in_all_windows",
+          "docstring": "在所有窗格中驗證所有規則",
+          "summary": "在這個函數中，目的是在所有窗格中驗證所有規則。"
+        },
+        {
+          "name": "_extract_window_values",
+          "docstring": "從窗格結果中提取數值矩陣",
+          "summary": "該函數的目的是從窗格結果中提取數值矩陣。"
+        },
+        {
+          "name": "_generate_equation_with_values",
+          "docstring": "為規則生成帶數值的等式（簡化版）",
+          "summary": "該函數的目的是為規則生成帶有數值的等式。"
+        },
+        {
+          "name": "_calculate_true_consistency_rates",
+          "docstring": "計算真實的一致性率",
+          "summary": "該函數的目的是計算真實的一致性率，通過統計每個規則在所有窗格中的驗證結果，並計算一致性率。"
+        },
+        {
+          "name": "main",
+          "docstring": "測試回溯式驗證",
+          "summary": "該函數的目的是測試回溯式驗證。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_eval.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_eval.py",
+      "functions": [
+        {
+          "name": "_to_matrix",
+          "docstring": "",
+          "summary": "這個函數的目的是將輸入的值轉換成二維列表的形式。如果輸入不是列表，則返回空列表；如果輸入是一維列表，則將其轉換為二維列表後返回。"
+        },
+        {
+          "name": "_pad_matrix",
+          "docstring": "",
+          "summary": "此函數的目的是將輸入的矩陣進行填充，使每一行的長度相同，不足的部分用None填充。"
+        },
+        {
+          "name": "_extract_equation_sides",
+          "docstring": "",
+          "summary": "提取方程式的两边并规范化，返回一个包含两个字符串的元组。"
+        },
+        {
+          "name": "_normalize_expression",
+          "docstring": "",
+          "summary": "此函數的目的是將表達式進行標準化處理，包括去除空格、替換特殊符號等。"
+        },
+        {
+          "name": "_eval_expr",
+          "docstring": "",
+          "summary": "此函數的目的是評估數學表達式，將表達式中的變數替換為提供的數值，並計算最終結果返回浮點數。"
+        },
+        {
+          "name": "_iter_window_results",
+          "docstring": "",
+          "summary": "這個函數的目的是迭代處理窗口結果，並返回一個 JSON 字典列表。"
+        },
+        {
+          "name": "_get_window_values",
+          "docstring": "",
+          "summary": "該函數用於從窗口結果中獲取值並返回以列表形式表示的值。"
+        },
+        {
+          "name": "_get_window_info",
+          "docstring": "",
+          "summary": "此函數用於從窗口結果中獲取窗口信息。如果窗口信息是字典類型則返回該信息，否則返回空字典。"
+        },
+        {
+          "name": "evaluate_rule_on_window",
+          "docstring": "",
+          "summary": "該函數的目的是在窗口值上評估規則，並返回評估結果的JSON字典。"
+        },
+        {
+          "name": "audit_windows_with_baseline",
+          "docstring": "",
+          "summary": "該函數用於根據基準規則對窗口進行審計，檢查窗口中的數據是否符合基準規則。"
+        },
+        {
+          "name": "audit_details_cells_with_baseline",
+          "docstring": "",
+          "summary": "該函數的目的是使用基準規則對詳細資料進行審核，並返回審核結果的摘要資訊和懷疑的資料單元。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_excel_baseline.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_excel_baseline.py",
+      "functions": [
+        {
+          "name": "_load_main_dataframe",
+          "docstring": "",
+          "summary": "該函數的目的是從Excel文件中加載主要數據框。它使用UniversalTableDetector來檢測表格，提取數據框，並返回第一個數據框。"
+        },
+        {
+          "name": "_build_window_details",
+          "docstring": "",
+          "summary": "此函數的目的是構建窗口詳細信息列表，並計算跳過的窗口數量。"
+        },
+        {
+          "name": "_prune_failed_windows",
+          "docstring": "",
+          "summary": "此函數的目的是根據傳入的參數，對失敗的視窗進行修剪，返回包含特定信息的字典列表。"
+        },
+        {
+          "name": "_collect_row_stats",
+          "docstring": "",
+          "summary": "此函數的目的是收集行統計信息，根據基準規則對詳細信息進行檢查，並計算通過率。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "此函數的目的是通過基準 discovered_rules.json（無LLM）來審核 Excel 文件，並生成相應的審核報告。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_io.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_io.py",
+      "functions": [
+        {
+          "name": "load_json",
+          "docstring": "從 path 讀取 JSON。\n\nReturns:\n    解析後的 dict 或 list（依檔案內容而定）。",
+          "summary": "該函數的目的是從指定路徑讀取 JSON 檔案，並返回解析後的 dict 或 list。"
+        },
+        {
+          "name": "write_report",
+          "docstring": "將 report 寫成 JSON（開發計畫 6.1 機器可讀主輸出）。\n\nArgs:\n    report: 可 json 序列化的結構。\n    out_path: 輸出檔路徑；目錄不存在時應建立（實作細節）。",
+          "summary": "將 report 寫成 JSON 格式，以機器可讀主輸出。接受 report 結構和輸出檔路徑作為參數，並在需要時建立目錄。"
+        },
+        {
+          "name": "write_text_report",
+          "docstring": "寫入人類可讀摘要（md 或 txt，開發計畫 6.2）。\n\nArgs:\n    content: 完整文字內容。\n    out_path: 輸出檔路徑。",
+          "summary": "該函數的目的是將完整文字內容寫入人類可讀的摘要文件（md或txt格式，開發計畫6.2）。"
+        },
+        {
+          "name": "load_optional_json",
+          "docstring": "可選載入；path 為 None 時回傳 None（CLI 選填參數用）。",
+          "summary": "該函數的目的是可選載入 JSON 檔案，當路徑為 None 時返回 None，用於處理 CLI 選填參數。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_mark_excel.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_mark_excel.py",
+      "functions": [
+        {
+          "name": "_load_main_dataframe",
+          "docstring": "",
+          "summary": "此函數用於從 Excel 檔案中加載主要資料框架，使用 UniversalTableDetector 來檢測表格並提取資料框架。"
+        },
+        {
+          "name": "_build_window_details",
+          "docstring": "",
+          "summary": "此函數的目的是構建窗口詳細信息，並返回一個包含字典的列表和一個整數。該函數遍歷窗口列表，生成提示數據，將符合條件的窗口信息添加到詳細信息列表中，同時計算被跳過的窗口數量。"
+        },
+        {
+          "name": "_extract_indices",
+          "docstring": "",
+          "summary": "此函數的目的是從輸入的表達式中提取索引值，並返回一個包含索引元組的列表。"
+        },
+        {
+          "name": "_collect_row_stats",
+          "docstring": "",
+          "summary": "此函數的目的是收集行統計信息，根據傳入的詳細信息和基準規則進行分析，並返回包含統計數據的字典。"
+        },
+        {
+          "name": "build_arg_parser",
+          "docstring": "",
+          "summary": "此函數的目的是建立一個命令行參數解析器，用於標記 Excel 中的可疑儲存格，並使用基準 discovered_rules.json。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "此函數的目的是從Excel文件中讀取數據，並根據基準規則進行規則審核，生成行規則通過摘要報告。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_normalize.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_normalize.py",
+      "functions": [
+        {
+          "name": "normalize_equation",
+          "docstring": "將 equation 或規律字串正規化為可比對形式。\n\nArgs:\n    eq: 原始字串（可能含空白差異、不同索引寫法）。\n\nReturns:\n    正規化後字串；實作時需與 extract_passed_rules / compare_rule_sets 約定一致。\n\nNote:\n    開發計畫建議：規律文字重複但空白格式不同時，統一由此函式處理。",
+          "summary": "該函數目的是將方程式或規則字串標準化為可比對的形式，處理空白差異和不同索引寫法，並返回標準化後的字串。"
+        },
+        {
+          "name": "try_split_equation_sides",
+          "docstring": "由單一 equation 字串嘗試拆出左右式（無 '=' 或格式不支援則回傳 None）。\n\n用途：equation_sides 為 null 時的補救（開發計畫 9.）；品質檢查可沿用。",
+          "summary": "該函數的目的是從單一方程式字串中嘗試拆分出左右兩側（如果沒有等號或格式不支援則返回 None）。這可用於補救 equation_sides 為 null 的情況，並可用於品質檢查。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_quality.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_quality.py",
+      "functions": [
+        {
+          "name": "_iter_window_results",
+          "docstring": "",
+          "summary": "這個函數用於迭代處理窗口結果，接受一個 JSON 對象作為輸入，返回一個 JSON 對象列表。如果輸入為空或為列表，則返回空列表；如果輸入為字典，則檢查特定鍵的值是否為列表，並返回該列表。"
+        },
+        {
+          "name": "_get_window_shape",
+          "docstring": "",
+          "summary": "此函數用於獲取窗口形狀，從給定的窗口結果中提取值並返回行和列的數量。"
+        },
+        {
+          "name": "_extract_indices",
+          "docstring": "",
+          "summary": "此函數的目的是從字符串列表中提取出包含數字對的索引，並返回一個包含元組的列表。"
+        },
+        {
+          "name": "run_quality_checks",
+          "docstring": "",
+          "summary": "運行質量檢查功能會檢查規則和詳細信息，並生成問題列表和指標數據。"
+        },
+        {
+          "name": "check_equation_sides_null",
+          "docstring": "",
+          "summary": "檢查方程式兩側是否為空。如果方程式不存在、不是列表、長度不為2或包含非字串元素，則返回True；否則返回False。"
+        },
+        {
+          "name": "check_placeholder_tokens",
+          "docstring": "",
+          "summary": "檢查方程式中是否包含特定的佔位符標記，如果包含則返回True，否則返回False。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_rules.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_rules.py",
+      "functions": [
+        {
+          "name": "extract_passed_rules",
+          "docstring": "從 discovered_rules.json 結構抽出「通過規律」列表。\n\nArgs:\n    discovered_json: load_json(discovered_rules.json) 結果。\n    row_key: 若指定，只取該 start_loc（或計畫中約定之群組鍵）底下之 passed_rules。\n    min_consistency: 若指定，過濾 consistency_rate 未達門檻之規律。\n\nReturns:\n    passed_rules 扁平化列表（或依實作約定附帶群組欄位）。",
+          "summary": "該函數從 discovered_rules.json 結構中提取出「通過規律」列表，可以根據指定的 row_key 和 min_consistency 進行過濾。返回包含通過規律的扁平化列表。"
+        },
+        {
+          "name": "compare_rule_sets",
+          "docstring": "比較 A/B 兩組已抽出之規律集合。\n\nArgs:\n    a_rules: baseline 或 A 檔規律列表。\n    b_rules: B 檔規律列表。\n    equation_key: 比對主鍵欄位名稱（預設 equation；可改 rule）。\n\nReturns:\n    建議含 summary、metrics、shared_rules、a_only_rules、b_only_rules（開發計畫 6.1）。",
+          "summary": "比較 A/B 兩組已抽出之規律集合，輸入為基準或 A 檔和 B 檔的規律列表，比對主鍵欄位名稱為 equation 或 rule，返回包含 summary、metrics、shared_rules、a_only_rules、b_only_rules 的 JSON 字典。"
+        },
+        {
+          "name": "rule_identity",
+          "docstring": "由單筆規律產生「集合比對用」鍵（可呼叫 normalize_equation）。\n\n實作時與 compare_rule_sets 共用，避免重複邏輯。",
+          "summary": "此函數的目的是從單個規則生成用於集合比對的鍵（可調用normalize_equation）。在實作中與compare_rule_sets共用，以避免重複邏輯。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_suspect.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_suspect.py",
+      "functions": [
+        {
+          "name": "_col_to_excel",
+          "docstring": "",
+          "summary": "此函數將整數轉換為 Excel 列索引字母表示。"
+        },
+        {
+          "name": "_to_excel_cell",
+          "docstring": "",
+          "summary": "該函數用於將行索引和列索引轉換為 Excel 單元格地址。"
+        },
+        {
+          "name": "_extract_indices",
+          "docstring": "",
+          "summary": "該函數的目的是從字符串列表中提取出包含數字對的索引元組列表。它會從不同格式的字符串中提取出索引對，並返回一個包含這些索引對的列表。"
+        },
+        {
+          "name": "_get_equation_sides_from_rule",
+          "docstring": "",
+          "summary": "此函數從規則中獲取方程式的兩側。如果規則中包含\"equation_sides\"，則直接返回；否則從\"equation\"、\"rule\"或\"description\"中提取並分割方程式。"
+        },
+        {
+          "name": "collect_suspect_cells",
+          "docstring": "",
+          "summary": "此函數的目的是收集懷疑的儲存格，根據失敗的項目和規則源。"
+        },
+        {
+          "name": "rank_suspect_cells",
+          "docstring": "",
+          "summary": "該函數的目的是對懷疑的儲存格進行排序，排序條件為儲存格的計數和窗口數量。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_tool.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_audit_tool.py",
+      "functions": [
+        {
+          "name": "_die",
+          "docstring": "",
+          "summary": "該函數_die用於輸出錯誤訊息並終止程式執行。"
+        },
+        {
+          "name": "build_parser",
+          "docstring": "",
+          "summary": "建立解析器功能用于构建命令行解析器，支持比较规则、基线审计、查找可疑单元格等操作。"
+        },
+        {
+          "name": "cmd_compare_rules",
+          "docstring": "",
+          "summary": "該函數用於比較兩組規則，輸出比較報告。"
+        },
+        {
+          "name": "cmd_audit_by_baseline",
+          "docstring": "",
+          "summary": "該函數的目的是使用基準規則對目標詳細資料進行稽核，並生成報告。"
+        },
+        {
+          "name": "cmd_find_suspect_cells",
+          "docstring": "",
+          "summary": "這個函數的目的是在給定的詳細資料中查找可疑的儲存格，並進行規則審核。"
+        },
+        {
+          "name": "cmd_audit_by_baseline_cells",
+          "docstring": "",
+          "summary": "這個函數的目的是通過基準單元進行審計，從輸入參數中讀取基準規則和目標詳細信息，提取通過的規則並生成報告。"
+        },
+        {
+          "name": "cmd_quality_check",
+          "docstring": "",
+          "summary": "該函數用於執行質量檢查，從輸入參數中讀取規則和詳細信息，運行質量檢查並將報告寫入輸出文件。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "此函數為主函數，根據傳入的參數執行不同的命令，包括比較規則、基準稽核、尋找可疑單元格、基準單元格稽核和品質檢查。如果命令未實現，則會引發NotImplementedError。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_degeneracy_filters.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\rule_degeneracy_filters.py",
+      "functions": [
+        {
+          "name": "_is_single_placeholder_norm",
+          "docstring": "",
+          "summary": "該函數用於檢查輸入字串是否為單一佔位符格式。"
+        },
+        {
+          "name": "_extract_placeholders",
+          "docstring": "",
+          "summary": "該函數的目的是從表達式中提取佔位符。如果輸入不是字符串或規範化後的表達式為空，則返回空列表；否則返回提取到的佔位符列表。"
+        },
+        {
+          "name": "_parse_placeholder",
+          "docstring": "",
+          "summary": "該函數用於解析佔位符，接受一個字符串參數並返回一個包含兩個整數的元組。"
+        },
+        {
+          "name": "_coerce_float",
+          "docstring": "",
+          "summary": "該函數用於將輸入值轉換為浮點數，並返回轉換後的浮點數值。"
+        },
+        {
+          "name": "equation_is_structurally_degenerate",
+          "docstring": "策略 1：僅依方程式字串與 equation_sides 做結構判斷。\n\nArgs:\n    equation: 完整等式，例如 \"$(0,0)*$(1,0)+$(2,0)=$(2,0)\"\n    equation_sides: 可選，左右式各一項的列表\n\nReturns:\n    (是否應剔除, 原因代碼或簡短說明)。框架預設 (False, \"\")。\n\n實作提示：\n    - 可先用 try_split_equation_sides 取得左右式，再 parse 出所有 $(r,c) 占位符。\n    - 檢查 LHS 與 RHS 是否代數上等價於「恒等」或「強制某乘積為 0」等形式。",
+          "summary": "該函數的目的是根據方程式字串和 equation_sides 進行結構判斷，返回是否應剔除以及原因代碼或簡短說明。"
+        },
+        {
+          "name": "collect_operand_samples_across_windows",
+          "docstring": "從同一 start_loc_row 的各視窗中，抽取方程式內 $(r,c) 對應的儲存格原始值。\n\nArgs:\n    group_results: 與 run_math_rule_analysis._retrospective_validate_start_loc_rows 相同群組\n    equation: 規律 equation\n    equation_sides: 可選 sides，便於只掃描相關占位符\n\nReturns:\n    鍵為正規化占位符字串（例如 \"$(0,0)\"），值為跨視窗收集到的原始值列表。\n    框架預設回傳空 dict，由呼叫端視為「略過策略 2」或於實作後填入。\n\n實作提示：\n    - 從 window_result 內既有欄位（例如視窗子矩陣、dataframe 切片）依 (r,c) 取値；\n    - 與 llm_math_rule_detector / WindowScanner 約定之索引原點需一致。",
+          "summary": "該函數目的是從同一 start_loc_row 的各視窗中，抽取方程式內 $(r,c)對應的儲存格原始值。"
+        },
+        {
+          "name": "operand_support_is_degenerate",
+          "docstring": "策略 2：依占位符樣本統計量判斷是否「無訊息」導致假成立。\n\nArgs:\n    samples_by_placeholder: collect_operand_samples_across_windows 的輸出\n    min_nonzero_count: 至少要有幾筆可判為非零的樣本（實作時定義「非零」）\n    min_distinct_nonzero: 非零相異值至少幾個（可區分常數 0 退化）\n\nReturns:\n    (是否應剔除, 原因)。框架預設 (False, \"\").\n\n實作提示：\n    - 僅對「應作為係數／加減量」的占位符套用較嚴格門檻，需與業務約定或 row 標籤結合時再擴充。",
+          "summary": "該函數的目的是根據占位符樣本統計量判斷是否存在「無訊息」導致假成立的情況。根據設定的閾值，判斷是否應該剔除該情況，並返回相應的結果。"
+        },
+        {
+          "name": "should_reject_passed_rule",
+          "docstring": "整合策略 1 + 2：通過一致性門檻後、寫入 passed_rules 前呼叫。\n\nReturns:\n    (True, reason) 表示應自 passed_rules 剔除並可記錄於 degeneracy_reject_reason；\n    (False, \"\") 表示保留。\n\n實作順序建議：先結構退化，再數值支援；任一命中即 reject。",
+          "summary": "該函數的目的是在通過一致性門檻後，寫入 passed_rules 前檢查是否應該拒絕已通過的規則。根據結構和數值支援的退化情況，返回應保留或拒絕的結果。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\run_math_rule_analysis.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\run_math_rule_analysis.py",
+      "functions": [
+        {
+          "name": "_with_file_suffix",
+          "docstring": "在副檔名前附加後綴（例如 observed + _phase1 -> observed_phase1.json）。",
+          "summary": "此函數的目的是在檔案路徑的副檔名前附加指定的後綴。"
+        },
+        {
+          "name": "__init__",
+          "docstring": "Args:\n    use_openai: 是否使用 OpenAI provider（否則走 TextProcessor 預設模型）\n    window_shape: 掃描視窗大小 (rows, cols)\n    openai_model: OpenAI 模型別名\n    consistency_threshold: 回溯驗證 passed_rules 的一致性門檻（與 CLI 預設一致）\n    degeneracy_min_nonzero_count: 退化過濾：每個 $(r,c) 至少需幾筆非零樣本\n    degeneracy_min_distinct_nonzero: 退化過濾：非零值至少幾個相異值\n    quick_scan_threshold: A線；每 start_loc 群 Phase1 僅抽樣本參數這麼多個視窗做 LLM，同群其餘延至 Phase2（0=關閉 A線）\n    quick_scan_seed: 可選；固定後每群 shuffle 可重現\n    use_phase1_global_llm_batch: True 時走 Phase1 全域湊滿 batch 排程（預設）\n    phase2_overlap_phase1_retro: A 線時是否讓 Phase2（I/O）與 Phase1 回溯+checkpoint（CPU/寫檔）並行",
+          "summary": "初始化MathRuleAnalyzer类的构造函数，用于设置各种参数，如是否使用OpenAI提供程序、扫描窗口大小、一致性门槛、退化过滤条件等。"
+        },
+        {
+          "name": "analyze_excel_file",
+          "docstring": "分析 Excel 檔案中的數學規律。\n\nArgs:\n    excel_file: Excel 檔案路徑\n    start_loc_row_name: 指定起始列名稱（可選）\n    \nReturns:\n    Dict: 分析結果",
+          "summary": "該函數的目的是分析 Excel 檔案中的數學規律。"
+        },
+        {
+          "name": "_postprocess_llm_equations",
+          "docstring": "對 llm_result['rules'] 做 equation_sides / equation 與列名對齊（原地修改）。",
+          "summary": "對 llm_result['rules']中的方程式進行處理，使 equation_sides / equation 與列名對齊。"
+        },
+        {
+          "name": "_resolve_llm_after_batch",
+          "docstring": "",
+          "summary": "這個函數的目的是在批次處理後解析數學規則。如果批次結果中沒有找到結果，則回退到單筆處理。"
+        },
+        {
+          "name": "_finalize_window_from_llm",
+          "docstring": "若 LLM 有結果則後處理、validate、組 window_result；否則回傳 None。",
+          "summary": "若LLM有結果，則進行後處理、驗證、並組成window_result；否則返回None。"
+        },
+        {
+          "name": "_fingerprints_valid_rules",
+          "docstring": "通過 validate 的規律以 normalize_equation 去重後的集合。",
+          "summary": "通過驗證的規則，經過規範化方程式去重後的集合。"
+        },
+        {
+          "name": "_stub_window_result_for_phase1_retro",
+          "docstring": "Phase1 尚未做 LLM 的視窗：僅帶 prompt_data，供回溯在每個視窗上重驗證 equation。",
+          "summary": "此函數用於在第一階段回溯驗證方程式，尚未執行LLM的視窗。提供prompt_data以在每個視窗上進行重驗證。"
+        },
+        {
+          "name": "_run_phase2_deferred_batches",
+          "docstring": "A 線 Phase2：將 deferred 視窗以 batch LLM 補齊，並依 start_loc 已知規律指紋做聯集去重略過。\n\n回傳 (phase2 新增的 window_results, valid_rules 增量, total_rules 增量,\n略過重複視窗計數, 更新後的 per_loc 指紋映射)。",
+          "summary": "在這個函數中，進行了 A 線 Phase2 的操作，將 deferred 視窗以 batch LLM 補齊，並根據 start_loc 已知的規律指紋做聯集去重略過。函數回傳了新增的 window_results、valid_rules 增量、total_rules 增量、略過重複視窗計數以及更新後的 per_loc 指紋映射。"
+        },
+        {
+          "name": "_phase1_quick_scan_per_group_batches",
+          "docstring": "Phase1（預設路徑）：逐 start_loc 群處理。\n\n語意變更註記（舊實作已刪）：\n- 已刪除：群內邊跑 LLM 邊累計「相異 validate 通過規律」達 quick_scan_threshold 才 defer 剩餘。\n- 現行：quick_scan_threshold = 每群 shuffle 後**最多幾個視窗**進 Phase1 LLM；\n  同群其餘視窗**不經 Phase1**，直接 append 到 deferred_queue，留給 Phase2 批量送問。",
+          "summary": "該函數的目的是在Phase1中逐一處理準備好的視窗群組，根據特定標準將部分視窗推遲處理，並將其餘視窗直接添加到待處理隊列中。"
+        },
+        {
+          "name": "_phase1_quick_scan_global_batch_scheduler",
+          "docstring": "Phase1（全域 batch）：與 per_group **同一抽樣語意**，差在 LLM 請求前先把「各群 Phase1 視窗」合併再切塊。\n\n已刪除之舊版（勿復用）：round-robin 依「相異規律數達標」決定 defer，與 quick_scan_threshold 新定義衝突。\n\nTODO（可交給呼叫端自訂的細節，目前採最簡併序）：\n- phase1_flat 的串接順序：現為 sorted(start_loc) 再依群 append；若需 round-robin 交錯各群 Phase1 視窗以平衡延遲，可在此調整。\n- phase1_batch_max 是否改為與 detect_math_rules_batch 參數或 CLI 一致。",
+          "summary": "該函數的目的是在全域批次中進行第一階段快速掃描，將各群的視窗合併後切割，以準備LLM請求。包含對已刪除的舊版進行說明，以及待完成的工作細節。"
+        },
+        {
+          "name": "_validate_by_start_loc_row",
+          "docstring": "依 start_loc_row 分組，檢查群組內規律一致性。\n\nArgs:\n    window_results: 視窗分析結果列表\n    \nReturns:\n    Dict: 每個 start_loc_row 的驗證結果摘要",
+          "summary": "根据 start_loc_row 分组，检查组内规律的一致性。返回每个 start_loc_row 的验证结果摘要。"
+        },
+        {
+          "name": "_retrospective_validate_start_loc_rows",
+          "docstring": "以回溯方式驗證每個 start_loc_row 的規律一致性。\n驗證流程：\n1. 依 start_loc_row_index 分組（key 為 row index）\n2. 蒐集每組中所有候選規律\n3. 逐條規律在該組視窗中回溯驗證\n4. 計算一致性比率與通過門檻規律\n\nArgs:\n    window_results: 視窗分析結果\nReturns:\n    Dict: 回溯驗證結果（key 為 row index）",
+          "summary": "這個函數的目的是以回溯方式驗證每個 start_loc_row 的規律一致性，包括分組、蒐集規律、回溯驗證和計算一致性比率。"
+        },
+        {
+          "name": "_apply_degeneracy_filters_to_passed_rules",
+          "docstring": "對已達 consistency 門檻的 passed_rules 再做退化過濾（策略 1+2）。\n\n實作位於 rule_degeneracy_filters；此處僅負責逐條呼叫與分流。\n\nReturns:\n    (保留的 passed_rules, 被剔除項及其 degeneracy_reject_reason)",
+          "summary": "對已達 consistency 門檻的 passed_rules 再做退化過濾（策略 1+2）。該函數位於 rule_degeneracy_filters，用於逐條呼叫與分流，返回保留的 passed_rules 和被剔除項及其 degeneracy_reject_reason。"
+        },
+        {
+          "name": "_collect_textprocessor_costs",
+          "docstring": "彙整 TextProcessor 使用量與計價資訊。\n\nArgs:\n    window_results: 視窗分析結果列表\n    \nReturns:\n    Dict: 成本彙整資訊",
+          "summary": "该函数的目的是归纳TextProcessor的使用量和计费信息。接受一个窗口分析结果列表作为参数，返回一个包含成本归纳信息的字典。"
+        },
+        {
+          "name": "_collect_all_rules_in_start_loc_row",
+          "docstring": "蒐集指定 start_loc_row 群組中的所有規律方程式。\nArgs:\n    group_results: 同一個 start_loc_row 的視窗結果\nReturns:\n    List[str]: 去重後的規律 equation 清單",
+          "summary": "該函數目的是蒐集指定 start_loc_row 群組中的所有規律方程式。接受同一個 start_loc_row 的視窗結果，返回去重後的規律 equation 清單。"
+        },
+        {
+          "name": "_retrospective_validate_rules_in_start_loc_row",
+          "docstring": "對 start_loc_row 內所有規律做回溯驗證。\n\nArgs:\n    all_rules: 該 start_loc_row 的規律 equation 列表\n    group_results: 該 start_loc_row 的視窗結果\nReturns:\n    Dict: 各規律的驗證結果細節",
+          "summary": "對 start_loc_row 內所有規律做回溯驗證，檢查規律方程式是否在視窗結果中出現。"
+        },
+        {
+          "name": "_find_description_for_equation",
+          "docstring": "找出 equation 對應的最常見 description。\n\nArgs:\n    equation: 規律 equation，例如 \"$0 - $1 = $2\"\n    group_results: 視窗結果列表\n    \nReturns:\n    str: 最常見 description，找不到則回傳 equation",
+          "summary": "這個函數的目的是找出給定方程式對應的最常見描述。如果找不到描述，則返回方程式本身。"
+        },
+        {
+          "name": "_check_rule_validation_in_window",
+          "docstring": "檢查規律在單一視窗中的驗證狀態。\n若無既有驗證資料，則改走重驗證流程。\n\nArgs:\n    rule_text: 規律文字\n    window_result: 視窗結果\n    \nReturns:\n    tuple[bool, str]: (是否有效, 驗證狀態)\n    驗證狀態: 'existing_valid', 'existing_invalid', 'revalidated_valid', 'revalidated_invalid', 'skip_invalid'",
+          "summary": "檢查規律在單一視窗中的驗證狀態。若無既有驗證資料，則改走重驗證流程。"
+        },
+        {
+          "name": "_should_skip_revalidation",
+          "docstring": "判斷是否應跳過重驗證。\n若規律已在此視窗被標記為無效，則跳過重驗證。\nArgs:\n    rule_text: 規律文字\n    window_result: 視窗結果\n    \nReturns:\n    bool: 是否應跳過重驗證",
+          "summary": "該函數的目的是判斷是否應該跳過重驗證，如果規律已在此視窗中被標記為無效，則跳過重驗證。接受規律文字和視窗結果作為參數，返回一個布爾值，表示是否應該跳過重驗證。"
+        },
+        {
+          "name": "_are_similar_rules",
+          "docstring": "判斷兩條規律是否相似（以關鍵字重疊為主）。\nArgs:\n    rule1: 規律1\n    rule2: 規律2\n    \nReturns:\n    bool: 是否相似",
+          "summary": "該函數的目的是判斷兩條規律是否相似，主要根據關鍵字的重疊程度來判斷。"
+        },
+        {
+          "name": "_validate_rule_with_window_data",
+          "docstring": "使用視窗資料重驗證規律，優先採用 equation_sides。\nArgs:\n    rule_text: 規律文字\n    window_result: 視窗結果\n    \nReturns:\n    bool: 是否驗證有效",
+          "summary": "使用視窗資料重驗證規律，優先採用 equation_sides。該函數會檢查規律文字和視窗結果，並返回布爾值以指示驗證是否有效。"
+        },
+        {
+          "name": "_verify_rule_mathematically_direct",
+          "docstring": "直接驗證規律的數學一致性（需提供 equation_sides）。\n\nArgs:\n    rule_text: 規律文字（用於錯誤訊息）\n    values: 數值矩陣\n    equation_sides: 左右式，例如 [\"$0 + $2\", \"$1\"]\n    \nReturns:\n    bool: 是否驗證成功",
+          "summary": "該函數的目的是直接驗證規律的數學一致性，需要提供等式的兩邊。"
+        },
+        {
+          "name": "_verify_equation_sides",
+          "docstring": "驗證 equation_sides 兩側是否近似相等。\nArgs:\n    equation_sides: 左右式列表，例如 [\"$0 + $2\", \"$1\"]\n    values: 視窗數值矩陣\n    tolerance: 容許誤差\n    \nReturns:\n    bool: 是否驗證成功",
+          "summary": "驗證左右式列表是否近似相等，使用視窗數值矩陣和容許誤差進行比較。"
+        },
+        {
+          "name": "_equation_sides_in_range",
+          "docstring": "檢查 equation_sides 中所有索引是否在 values 的範圍內。",
+          "summary": "檢查 equation_sides 中所有索引是否在 values 的範圍內。"
+        },
+        {
+          "name": "_evaluate_dollar_expression",
+          "docstring": "解析 $(a,b) 索引運算式（例如 \"$(0,0) + $(1,0)\"）。\nArgs:\n    expression: 運算式，例如 \"$(0,0) + $(1,0)\" 或 \"$(0,1)\"\n    values: 數值矩陣\nReturns:\n    float: 計算結果",
+          "summary": "該函數的目的是解析包含 $(a,b) 索引運算式的數學表達式，例如\"$(0,0)+ $(1,0)\"。接受運算式和數值矩陣作為輸入，返回計算結果。"
+        },
+        {
+          "name": "_safe_eval_math_expression_simple",
+          "docstring": "安全計算純數學運算式（僅允許數字與 +-*/()）。\nArgs:\n    expression: 數學運算式，例如 \"237.6 + 1.2\"\n    \nReturns:\n    float: 計算結果",
+          "summary": "這個函數的目的是安全計算純數學運算式，只允許使用數字和基本的運算符號（+-*/()）。接受一個數學運算式作為參數，並返回計算結果。"
+        },
+        {
+          "name": "_find_equation_sides_for_rule",
+          "docstring": "嘗試從 llm_result 中找出與規律文字對應的 equation_sides；若無則從 rule/equation 解析含 $ 索引的等式並拆成左右式。\n會比對 equation（或 rule、description）與規律文字是否一致，再取出 $i 形式的左右式。\n回傳形如 [\"$0 + $1\", \"$2\"] 的 list，找不到則為 None。",
+          "summary": "該函數的目的是從llm_result中尋找與規律文字對應的等式兩側，若找不到則從規則/等式中解析含有$索引的等式並拆分為左右兩側。最終返回形如[\"$0 + $1\",\"$2\"]的列表，如果找不到則返回None。"
+        },
+        {
+          "name": "_map_terms_to_indices",
+          "docstring": "將規律文字中的關鍵詞（如 computed / input / target）對應到 row_names 的索引順序。\n回傳索引列表（例如 [0,1,2]），供對應 $(r,0) 形式占位符。",
+          "summary": "這個函數的目的是將規律文字中的關鍵詞（如 computed / input / target）對應到 row_names 的索引順序，並回傳索引列表以供占位符使用。"
+        },
+        {
+          "name": "_attach_equation_preview",
+          "docstring": "在 validation_detail 上附加可讀的 equation 預覽字串，便於除錯與閱讀。\n範例: \"$0 + $1 = $2\"",
+          "summary": "該函數的目的是在 validation_detail 上附加可讀的 equation 預覽字串，以便於除錯和閱讀。"
+        },
+        {
+          "name": "_extract_window_values",
+          "docstring": "Extract numeric matrix values from a window_result structure.",
+          "summary": "提取MathRuleAnalyzer._extract_window_values函数中的window_result结构中的数值矩阵值。"
+        },
+        {
+          "name": "_count_numeric_cells",
+          "docstring": "",
+          "summary": "該函數用於計算矩陣中的數值單元格數量。"
+        },
+        {
+          "name": "_check_rule_consistency",
+          "docstring": "檢查同一 start_loc_row 群組內規律的一致性。\nArgs:\n    group_results: 同一 start_loc_row 的視窗結果列表\nReturns:\n    List[Dict]: 一致性足夠的規律列表",
+          "summary": "檢查同一 start_loc_row 群組內規律的一致性，返回一致性足夠的規律列表。"
+        },
+        {
+          "name": "_calculate_rule_consistency_rate",
+          "docstring": "計算單一規律在整體分析中的一致性比率。\n\nArgs:\n    rule_text: 規律文字\n    analysis_result: 完整分析結果\nReturns:\n    float: 一致性比率 (0.0 - 1.0)",
+          "summary": "計算單一規律在整體分析中的一致性比率。接受規律文字和完整分析結果作為參數，返回一致性比率值在0.0到1.0之間。"
+        },
+        {
+          "name": "generate_rule_summary",
+          "docstring": "彙整分析結果產生規律摘要與統計（含一致性門檻篩選）。\nArgs:\n    analysis_result: 分析結果\n    consistency_threshold: 一致性門檻，預設 80%\nReturns:\n    Dict: 含規律列表與統計資訊",
+          "summary": "該函數的目的是彙整分析結果，生成規律摘要與統計資訊，並包含一致性門檻篩選。"
+        },
+        {
+          "name": "save_rule_summary",
+          "docstring": "將規律摘要寫入 discovered_rules.json、rule_statistics.json 等輸出檔。\nArgs:\n    analysis_result: 分析結果\n    output_dir: 輸出目錄（可選）\n    consistency_threshold: 一致性門檻，預設 80%\n    file_suffix: 檔名後綴（例：_phase1、_phase2_final）\n    print_summary: 是否列印規律摘要到 console\nReturns:\n    str: 主要規律 JSON 檔路徑",
+          "summary": "將規律摘要寫入 discovered_rules.json、rule_statistics.json等輸出檔。"
+        },
+        {
+          "name": "save_analysis_snapshot",
+          "docstring": "將完整 analysis_result 寫成快照 JSON（可用於 phase1/phase2 分段產物）。",
+          "summary": "將完整的分析結果轉換為快照 JSON 格式，可用於不同階段的產物。"
+        },
+        {
+          "name": "save_to_observed_json",
+          "docstring": "Save analysis output into observed.json-style structure.",
+          "summary": "將分析結果保存為 observed.json 格式的結構。"
+        },
+        {
+          "name": "save_timer",
+          "docstring": "將各階段 timer 資訊寫入 timer.json。",
+          "summary": "將各階段計時器資訊寫入 timer.json 檔案。"
+        },
+        {
+          "name": "build_arg_parser",
+          "docstring": "",
+          "summary": "此函數的目的是建立命令行參數解析器，用於執行數學規則分析運行器。"
+        },
+        {
+          "name": "main",
+          "docstring": "CLI entrypoint.",
+          "summary": "此函數是用作CLI入口點，主要功能是分析數學規則。根據給定的參數，對Excel文件進行分析並保存分析結果。如果設置了保存詳細信息的選項，還會保存詳細信息到JSON文件。如果啟用了特定參數，則會保留另一份最終結論後綴檔。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\simple_llm_test.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\simple_llm_test.py",
+      "functions": [
+        {
+          "name": "test_openai",
+          "docstring": "測試OpenAI API",
+          "summary": "測試OpenAI API。"
+        },
+        {
+          "name": "simple_llm_test",
+          "docstring": "簡單的LLM測試",
+          "summary": "這個函數的目的是進行簡單的LLM測試，包括設定API URL、模型名稱、建立會話、發送請求並處理回應。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\simple_test.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\simple_test.py",
+      "functions": [
+        {
+          "name": "test_basic_functionality",
+          "docstring": "測試基本功能（不使用語言模型）",
+          "summary": "測試基本功能，不使用語言模型。該函數測試Excel檔案的基本功能，包括檢查數字表格、計算缺失值比例以及提取特定區域的資料。"
+        },
+        {
+          "name": "test_sheet_to_text",
+          "docstring": "測試工作表轉文字功能",
+          "summary": "測試工作表轉文字功能。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主函數，執行簡化測試，並在遇到錯誤時捕獲並列印錯誤訊息。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\table_detector.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\table_detector.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化偵測器",
+          "summary": "初始化偵測器，設定API金鑰、缺失比率等參數，建立OpenAI客戶端和session。"
+        },
+        {
+          "name": "_load_prompts",
+          "docstring": "載入提示模板",
+          "summary": "該函數的目的是載入提示模板(json檔案)並返回一個包含提示內容的字典。"
+        },
+        {
+          "name": "_call_local_llm",
+          "docstring": "呼叫本地語言模型",
+          "summary": "呼叫本地語言模型，使用參考檔案的方法發送請求並處理回應，返回相應的內容或錯誤信息。"
+        },
+        {
+          "name": "_call_openai",
+          "docstring": "呼叫OpenAI API",
+          "summary": "呼叫OpenAI API。"
+        },
+        {
+          "name": "_call_llm",
+          "docstring": "呼叫語言模型",
+          "summary": "該函數的目的是呼叫語言模型，根據參數prefer_local的值選擇使用本地模型或OpenAI模型。"
+        },
+        {
+          "name": "_sheet_to_text",
+          "docstring": "將DataFrame轉換為文字格式供LLM分析",
+          "summary": "將DataFrame轉換為文字格式以供LLM分析。"
+        },
+        {
+          "name": "_num_to_col_letter",
+          "docstring": "將數字轉換為Excel欄位字母",
+          "summary": "這個函數的目的是將數字轉換為Excel欄位字母。該函數接受一個整數作為輸入，並返回對應的Excel欄位字母。"
+        },
+        {
+          "name": "_is_numeric_table",
+          "docstring": "檢查是否為純數字表格",
+          "summary": "檢查是否為純數字表格，對於已知的測試檔案，直接檢查數值區域。"
+        },
+        {
+          "name": "_calculate_missing_ratio",
+          "docstring": "計算缺失值比例",
+          "summary": "該函數的目的是計算DataFrame中缺失值的比例。"
+        },
+        {
+          "name": "_batch_analyze_large_sheet",
+          "docstring": "批量分析大型工作表",
+          "summary": "該函數的目的是批量分析大型工作表，對工作表進行分批处理，生成相应的提示信息并调用LLM进行分析。"
+        },
+        {
+          "name": "detect_tables",
+          "docstring": "偵測Excel檔案中的表格\n\nArgs:\n    excel_file: Excel檔案路徑\n    table_mode: 表格模式 ('pure_numeric' 或 'general')\n    missing_ratio: 缺失值比例閾值\n    prefer_local: 是否優先使用本地LLM\n\nReturns:\n    偵測到的表格列表",
+          "summary": "這個函數的目的是偵測Excel檔案中的表格，可以設定不同的表格模式和閾值來進行偵測，並返回偵測到的表格列表。"
+        },
+        {
+          "name": "extract_dataframes",
+          "docstring": "根據偵測結果提取DataFrame\n\nArgs:\n    excel_file: Excel檔案路徑\n    detection_results: 偵測結果\n\nReturns:\n    提取的DataFrame列表",
+          "summary": "根據偵測結果提取DataFrame。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主函數，用於執行Excel表格區域的偵測。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\table_index_llm.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\table_index_llm.py",
+      "functions": [
+        {
+          "name": "_is_numeric",
+          "docstring": "",
+          "summary": "該函數用於檢查輸入值是否為數字。"
+        },
+        {
+          "name": "_cell_type",
+          "docstring": "",
+          "summary": "該函數的目的是根據輸入值的類型返回相應的單元格類型，如果值為空則返回\"empty\"，如果值為數字則返回\"numeric\"，否則返回\"text\"。"
+        },
+        {
+          "name": "_compute_row_col_stats",
+          "docstring": "",
+          "summary": "該函數的目的是計算表格中每行和每列的統計信息，包括非空單元格數量、文本單元格數量、數字單元格數量以及文本和數字的比例。"
+        },
+        {
+          "name": "_format_stats",
+          "docstring": "",
+          "summary": "這個函數的目的是格式化列和行的統計數據，並以特定格式返回。"
+        },
+        {
+          "name": "_get_cell",
+          "docstring": "",
+          "summary": "此函數用於從二維列表中獲取特定行和列的元素。如果行或列索引小於1，則返回None。"
+        },
+        {
+          "name": "crop_table_with_headers",
+          "docstring": "依「資料區」座標裁切表格，並保留對應欄/列標題。\n\n- row_header_index / col_header_index: 1-based，無則 -1\n- data_row_start/end, data_col_start/end: 1-based，針對「去掉標題後」的資料列/欄\n\n回傳：\n{\n  \"values\": 裁切後含標題的二維陣列,\n  \"row_header_index\": 新表格中的標題列位置 (1 或 -1),\n  \"col_header_index\": 新表格中的標題欄位置 (1 或 -1)\n}",
+          "summary": "該函數的目的是根據指定的「資料區」座標，裁切表格並保留對應的列和欄標題。"
+        },
+        {
+          "name": "crop_table_with_headers_df",
+          "docstring": "使用 pandas 將欄列標題轉成 columns/index，再裁切資料區。\n\n- row_header_index / col_header_index: 1-based，無則 -1\n- data_row_start/end, data_col_start/end: 1-based，針對「去掉標題後」的資料列/欄\n回傳 dict: {\"df\": DataFrame, \"row_header_index\": int, \"col_header_index\": int}",
+          "summary": "使用 pandas 將欄列標題轉成 columns/index，再裁切資料區。"
+        },
+        {
+          "name": "_suggest_col_header",
+          "docstring": "",
+          "summary": "該函數的目的是根據列統計信息建議列標題。"
+        },
+        {
+          "name": "_suggest_row_header",
+          "docstring": "",
+          "summary": "該函數的目的是從行統計中提供建議的行標題，根據文字比例和填值數量來判斷。"
+        },
+        {
+          "name": "_format_heuristic_hint",
+          "docstring": "",
+          "summary": "這個函數的目的是根據給定的行和列提示，格式化並返回一個包含啟發式建議的字符串。"
+        },
+        {
+          "name": "build_prompt",
+          "docstring": "",
+          "summary": "此函數用於建立表格結構判讀助手的提示，指引使用者判斷表格中的標題列和標題欄。"
+        },
+        {
+          "name": "call_textprocessor",
+          "docstring": "",
+          "summary": "該函數用於調用文本處理器，通過傳入的參數向指定的URL發送POST請求，並返回處理後的文本內容和相關數據。"
+        },
+        {
+          "name": "main",
+          "docstring": "",
+          "summary": "此功能的目的是为LLM探针检测每个表格的行/列索引。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\test_cleanup_verification.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\test_cleanup_verification.py",
+      "functions": [
+        {
+          "name": "test_removed_methods",
+          "docstring": "測試已移除的方法",
+          "summary": "測試已移除的方法。"
+        },
+        {
+          "name": "test_remaining_methods",
+          "docstring": "測試保留的方法",
+          "summary": "測試保留的方法，透過檢查MathRuleAnalyzer和LLMMathRuleDetector中是否存在指定的方法，確認這些方法是否被保留。"
+        },
+        {
+          "name": "test_equation_sides_only",
+          "docstring": "測試只支援equation_sides格式",
+          "summary": "測試函數的目的是驗證支援特定equation_sides格式的數學規則。"
+        },
+        {
+          "name": "main",
+          "docstring": "主測試函數",
+          "summary": "該函數的目的是作為主測試函數，用於驗證數學表達式相關函式的清理效果。在函數中，會執行多個測試函式，並列出已移除的舊格式支援和保留的新格式支援，以及系統目前的狀態。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\test_debug_app.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\test_debug_app.py",
+      "functions": [
+        {
+          "name": "test_debug_app",
+          "docstring": "測試偵錯應用程式",
+          "summary": "該函數的目的是測試偵錯應用程式，包括初始化應用程式、檢查測試文件是否存在以及執行偵錯分析。"
+        },
+        {
+          "name": "test_individual_components",
+          "docstring": "測試個別組件",
+          "summary": "測試個別組件。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\universal_table_detector.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\universal_table_detector.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化偵測器",
+          "summary": "初始化偵測器，設定相關環境變數和客戶端。"
+        },
+        {
+          "name": "_load_prompts",
+          "docstring": "載入提示模板",
+          "summary": "該函數的目的是載入提示模板。"
+        },
+        {
+          "name": "detect_tables_by_analysis",
+          "docstring": "通過數據分析自動偵測表格",
+          "summary": "通過數據分析自動偵測表格。"
+        },
+        {
+          "name": "_analyze_data_distribution",
+          "docstring": "分析數據分布，找出可能的表格區域",
+          "summary": "該函數的目的是分析數據分布，找出可能的表格區域。"
+        },
+        {
+          "name": "_is_valid_data",
+          "docstring": "判斷是否為有效數據",
+          "summary": "該函數的目的是判斷是否為有效數據，根據不同的表格模式進行判斷。"
+        },
+        {
+          "name": "_find_dense_regions",
+          "docstring": "尋找密集區域",
+          "summary": "該函數的目的是尋找密集區域，通過分析給定的密度矩陣，找到符合最小尺寸條件的連通區域並返回。"
+        },
+        {
+          "name": "_flood_fill",
+          "docstring": "洪水填充算法找連通區域",
+          "summary": "該函數的目的是使用洪水填充算法來找到連通區域。"
+        },
+        {
+          "name": "_is_valid_region",
+          "docstring": "判斷區域是否有效",
+          "summary": "該函數的目的是判斷區域是否有效。"
+        },
+        {
+          "name": "_analyze_table_structure",
+          "docstring": "分析表格結構，尋找標題和索引",
+          "summary": "該函數的目的是分析表格結構，尋找標題和索引。"
+        },
+        {
+          "name": "_find_column_headers",
+          "docstring": "尋找列標題",
+          "summary": "該函數的目的是尋找表格的列標題。"
+        },
+        {
+          "name": "_find_row_index",
+          "docstring": "尋找行索引",
+          "summary": "這個函數的目的是在給定的資料框和區域中尋找行索引。"
+        },
+        {
+          "name": "_analyze_with_llm",
+          "docstring": "使用LLM分析表格結構",
+          "summary": "該函數的目的是使用LLM分析表格結構。"
+        },
+        {
+          "name": "_extract_context_data",
+          "docstring": "提取區域周圍的數據供LLM分析",
+          "summary": "提取區域周圍的數據供LLM分析。"
+        },
+        {
+          "name": "_call_llm",
+          "docstring": "呼叫LLM",
+          "summary": "這個函數的目的是呼叫LLM，根據優先選項使用本地LLM或OpenAI，並返回結果。"
+        },
+        {
+          "name": "_call_local_llm",
+          "docstring": "呼叫本地LLM",
+          "summary": "呼叫本地LLM，接收訊息並進行處理，返回處理後的結果。"
+        },
+        {
+          "name": "_call_openai",
+          "docstring": "呼叫OpenAI API",
+          "summary": "呼叫OpenAI API。"
+        },
+        {
+          "name": "extract_dataframes",
+          "docstring": "提取DataFrame",
+          "summary": "提取DataFrame。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主函數，用於執行通用表格偵測器，接收參數並執行表格偵測，最後提取DataFrame示例。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\utils.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\utils.py",
+      "functions": [
+        {
+          "name": "_ensure_outputs_root",
+          "docstring": "",
+          "summary": "確保輸出根目錄存在。"
+        },
+        {
+          "name": "_to_output_path",
+          "docstring": "Normalize a path to tmp2/outputs for relative paths.\n\nRules:\n- absolute path: keep as-is\n- relative `outputs/...`: map to tmp2/outputs/...\n- relative `log/...`: map to tmp2/outputs/log/...\n- other relative paths: map to tmp2/outputs/<path>",
+          "summary": "将路径规范化为相对路径的 tmp2/outputs。- 绝对路径保持不变- 相对路径 outputs/... 映射到 tmp2/outputs/...- 相对路径 log/... 映射到 tmp2/outputs/log/...- 其他相对路径映射到 tmp2/outputs/<path>"
+        },
+        {
+          "name": "for_file_process",
+          "docstring": "",
+          "summary": "這個函數的目的是處理文件中的標記，將標記中的\"<\"和\">\"替換為特定符號\"〈\"和\"〉\"，最後返回處理後的標記。"
+        },
+        {
+          "name": "type_string",
+          "docstring": "",
+          "summary": "此函數用於返回對象的類型字符串，可以指定索引和分隔符。"
+        },
+        {
+          "name": "parse",
+          "docstring": "",
+          "summary": "這個函數的目的是解析輸入的數據，並根據不同類型進行處理，包括對數組、字典和數字的處理，並提供一些參數設置如小數位數、最大長度等。"
+        },
+        {
+          "name": "isinstance_not_empty",
+          "docstring": "",
+          "summary": "該函數用於檢查變數是否為指定類型且不為空。"
+        },
+        {
+          "name": "stamp_process",
+          "docstring": "",
+          "summary": "此函數用於處理標記，根據不同情況生成不同格式的標記字符串。"
+        },
+        {
+          "name": "addlog",
+          "docstring": "",
+          "summary": "此函數的目的是處理日誌信息，包括對日誌進行填充和對齊處理，並根據特定條件進行日誌計數。"
+        },
+        {
+          "name": "addloger",
+          "docstring": "",
+          "summary": "該函數的目的是創建一個新的函數，該函數將接收的參數轉發給另一個名為addlog的函數。"
+        },
+        {
+          "name": "execute",
+          "docstring": "",
+          "summary": "該函數的目的是根據特定條件在容器中查找指定名稱的值，並返回該值。"
+        },
+        {
+          "name": "executeEasy",
+          "docstring": "",
+          "summary": "該函數的目的是調用execute函數，並將參數傳遞給它，同時設置默認值和告警選項。"
+        },
+        {
+          "name": "exception_process",
+          "docstring": "",
+          "summary": "這個函數的目的是處理異常，將異常信息記錄到日誌文件中，並提供自定義的處理程序。"
+        },
+        {
+          "name": "detect_txt_encoding",
+          "docstring": "",
+          "summary": "這個函數的目的是檢測文本文件的編碼，如果無法確定則返回預設編碼。"
+        },
+        {
+          "name": "load_json",
+          "docstring": "",
+          "summary": "該函數的目的是從JSON文件中加載數據。如果文件不存在，則返回空字典。根據文件的編碼自動檢測並加載數據。"
+        },
+        {
+          "name": "_safe_print",
+          "docstring": "Print text without crashing on console encoding issues (e.g. cp950).",
+          "summary": "這個函數在處理控制台編碼問題時，能夠安全地打印文本，避免程式崩潰。"
+        },
+        {
+          "name": "_stamps_to_text",
+          "docstring": "",
+          "summary": "此函數將時間戳轉換為文字格式。"
+        },
+        {
+          "name": "_append_log_line",
+          "docstring": "",
+          "summary": "此函數用於將一行文本附加到日誌文件中，如果文件不存在則創建。"
+        },
+        {
+          "name": "interval_overlap_seconds",
+          "docstring": "Return overlap seconds of intervals [a0,a1] and [b0,b1]; None if any endpoint is not datetime.",
+          "summary": "返回重疊時間間隔的秒數，如果任何端點不是日期時間則返回None。"
+        },
+        {
+          "name": "default",
+          "docstring": "",
+          "summary": "該函數的目的是自定義JSON編碼器，將NumPy數據類型轉換為基本Python數據類型。"
+        },
+        {
+          "name": "addloger",
+          "docstring": "",
+          "summary": "此函數用於添加日誌，接受不定數量的關鍵字參數並返回一個可調用對象。該函數會將日誌信息寫入文件並在終端顯示。"
+        },
+        {
+          "name": "exception_process",
+          "docstring": "",
+          "summary": "這個函數的目的是處理異常情況，將錯誤信息記錄到日誌文件中，並在控制台上顯示相應的錯誤信息。"
+        },
+        {
+          "name": "CreateFile",
+          "docstring": "",
+          "summary": "此函數的目的是在指定路徑創建文件，並在遇到錯誤時進行重試。"
+        },
+        {
+          "name": "save_json",
+          "docstring": "",
+          "summary": "該函數的目的是將數據保存為JSON文件。"
+        },
+        {
+          "name": "isnonnumber",
+          "docstring": "Compatibility helper from dataframeprocedure: True when value is not numeric-castable.",
+          "summary": "該函數的目的是檢查輸入值是否無法轉換為數字，當輸入值無法轉換時返回True。"
+        },
+        {
+          "name": "isiterable",
+          "docstring": "Compatibility helper from dataframeprocedure/LOGger.",
+          "summary": "該函數的目的是檢查輸入是否可迭代，並排除指定的例外情況。"
+        },
+        {
+          "name": "normalize_idx",
+          "docstring": "Normalize $(r,c) / $r tokens into explicit 2D $(r,c) form.",
+          "summary": "該函數的目的是將$(r,c)/ $r標記規範化為明確的2D $(r,c)形式。"
+        },
+        {
+          "name": "repl_names",
+          "docstring": "Replace row-name tokens in expression with $(row_index,0).",
+          "summary": "這個函數的目的是將表達式中的行名稱標記替換為$(row_index,0)。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\verify_old_algorithm_removed.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\verify_old_algorithm_removed.py",
+      "functions": [
+        {
+          "name": "check_old_functions_removed",
+          "docstring": "檢查舊函數是否已被移除",
+          "summary": "檢查舊函數是否已被移除。"
+        },
+        {
+          "name": "check_new_functions_exist",
+          "docstring": "檢查新函數是否存在",
+          "summary": "檢查新函數是否存在。"
+        },
+        {
+          "name": "check_function_signatures",
+          "docstring": "檢查新函數的簽名是否正確",
+          "summary": "該函數的目的是檢查新函數的簽名是否正確。"
+        },
+        {
+          "name": "check_code_for_old_references",
+          "docstring": "檢查代碼中是否還有對舊函數的引用",
+          "summary": "檢查代碼中是否還有對舊函數的引用。"
+        },
+        {
+          "name": "main",
+          "docstring": "主檢查函數",
+          "summary": "此函數的目的是主要檢查舊的錯誤一致性率算法是否已完全移除，並執行一系列檢查以確保新算法的正確性。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\dataProcess\\window_scanner.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\dataProcess\\window_scanner.py",
+      "functions": [
+        {
+          "name": "__init__",
+          "docstring": "初始化窗格掃描器\n\nArgs:\n    window_shape: 窗格形狀 (rows, cols)，預設(5, 1)",
+          "summary": "初始化窗格掃描器，設定窗格形狀，預設為(5,1)。"
+        },
+        {
+          "name": "scan_dataframe",
+          "docstring": "掃描DataFrame，產生窗格子dataframe\n\nArgs:\n    df: 要掃描的DataFrame\n    step_size: 步長 (row_step, col_step)，預設(1, 1)\n\nReturns:\n    List[Dict]: 包含窗格資訊的列表",
+          "summary": "掃描DataFrame，產生窗格子dataframe，返回包含窗格資訊的列表。"
+        },
+        {
+          "name": "_is_valid_window",
+          "docstring": "檢查窗格是否有效\n\nArgs:\n    window_df: 窗格DataFrame\n    \nReturns:\n    bool: 是否有效",
+          "summary": "檢查窗格是否有效，確保至少有50%的非空值。"
+        },
+        {
+          "name": "_get_excel_range",
+          "docstring": "轉換為Excel範圍表示法\n\nArgs:\n    start_row, start_col, end_row, end_col: 範圍座標 (0-based)\n    \nReturns:\n    str: Excel範圍字串，如 \"A1:A5\"",
+          "summary": "該函數的目的是將範圍座標轉換為Excel範圍表示法，例如將(0,0,4,0)轉換為\"A1:A5\"。"
+        },
+        {
+          "name": "filter_windows_by_start_loc_row",
+          "docstring": "根據起始列名稱（window 第一列）過濾窗格\n\nArgs:\n    windows: 窗格列表\n    start_loc_row_name: 起始列名稱（window 第一列）\n    \nReturns:\n    List[Dict]: 符合條件的窗格列表",
+          "summary": "根據起始列名稱（window 第一列）過濾窗格。接受窗格列表和起始列名稱，返回符合條件的窗格列表。"
+        },
+        {
+          "name": "generate_prompt_data",
+          "docstring": "為窗格生成提示資料\n\nArgs:\n    window: 窗格資訊\n    \nReturns:\n    Dict: 提示資料",
+          "summary": "該函數的目的是為窗格生成提示資料，提取窗格中的數值矩陣、名稱和相關資訊，並返回提示資料的字典。"
+        },
+        {
+          "name": "main",
+          "docstring": "主函數",
+          "summary": "該函數的目的是作為主要函數，用於掃描DataFrame中的窗格。"
+        }
+      ]
+    },
+    "C:\\ML_HOME\\ExcelStudio\\ExcelStudio.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\ExcelStudio.py",
+      "functions": [
+        {
+          "name": "apply_discovered_rules_fast_mark_target",
+          "docstring": "Fast-mark target Excel using discovered rules (Phase1 optional).\n\nThis currently reuses rule_audit_mark_excel to produce audit_marked_fast.xlsx.",
+          "summary": "使用发现的规则快速标记目标Excel（可选Phase1）。当前重用rule_audit_mark_excel来生成audit_marked_fast.xlsx。"
+        },
+        {
+          "name": "parse_detect_rules",
+          "docstring": "Load detect_rules/discovered_rules json.",
+          "summary": "解析檢測規則/發現規則的 JSON 檔案。"
+        },
+        {
+          "name": "_get_run_math_rule_analysis_symbols",
+          "docstring": "Lazy import to avoid forcing heavy baseline-analysis dependencies\nwhen callers only need rules-only audit.",
+          "summary": "此函數是為了避免在呼叫者僅需要規則審核時強制使用重型基線分析依賴而進行的延遲導入。"
+        },
+        {
+          "name": "_safe_default",
+          "docstring": "",
+          "summary": "此函數用於從解析器中獲取鍵的默認值，如果出現異常則返回指定的回退值。"
+        },
+        {
+          "name": "_abs_path",
+          "docstring": "",
+          "summary": "該函數的目的是將相對路徑轉換為絕對路徑。"
+        },
+        {
+          "name": "detect_target_with_rules",
+          "docstring": "Audit target Excel directly with an existing discovered_rules json.\nThis path skips baseline rule discovery.",
+          "summary": "這個函數的目的是使用現有的 discovered_rules json 直接對目標 Excel 進行審計，跳過基準規則的發現過程。"
+        },
+        {
+          "name": "detect_defect_simple_with_prompt_rules",
+          "docstring": "Convenience wrapper:\n- rules:   C:\\ML_HOME\\ExcelStudio\\prompts\\discovered_rules.json\n- target:  C:\\ML_HOME\\ExcelStudio\\defect_simple.xlsx",
+          "summary": "這個函數的目的是使用預設的檢測規則來檢測目標 Excel 檔案中的缺陷，並生成一個包含標記的輸出 Excel 檔案。"
+        },
+        {
+          "name": "main_rules_only",
+          "docstring": "CLI entry for auditing with an existing discovered_rules file only.\nDoes not require baseline_excel.",
+          "summary": "此函數為 CLI 入口，用於僅使用現有的 discovered_rules 檔案進行審核，不需要基準 Excel 檔案。"
+        },
+        {
+          "name": "main",
+          "docstring": "1) Build/Load detect rules from baseline file (A).\n2) Use rules to audit target file (B) and output marked Excel.",
+          "summary": "該函數目的是從基準文件(A)中構建/加載檢測規則，然後使用這些規則對目標文件(B)進行審核，並輸出標記的Excel文件。"
+        },
+        {
+          "name": "build_arg_parser",
+          "docstring": "",
+          "summary": "這個函數的目的是建立命令行參數解析器，用於 ExcelStudio 程式。它定義了不同的參數，包括基準 Excel 檔案、目標 Excel 檔案、檢測規則檔案等。"
+        },
+        {
+          "name": "build_arg_parser_rules_only",
+          "docstring": "",
+          "summary": "該函數的目的是建立一個用於解析命令行參數的解析器，用於對目標Excel進行審計。"
+        }
+      ]
+    }
+  }
+}

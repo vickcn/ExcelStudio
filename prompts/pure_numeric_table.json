@@ -1,0 +1,8 @@
+{
+  "system_prompt": "你是一個專業的Excel表格分析專家，專門偵測純數字標準表格。請務必只回傳有效的JSON格式，不要添加任何其他文字或說明。",
+  "user_prompt": "請分析以下Excel工作表內容，找出所有符合純數字標準表格的區域。\n\n純數字標準表格定義：\n1. 表格中的值都必須是數字、NaN、inf、None或空字串\n2. 必須有明確的表格結構（行列對齊）\n3. 可能包含欄位標題（columns）和索引標籤（index）\n4. 注意：數據通常不會從第1行第1列開始，請仔細識別實際的數據區域\n5. 索引區域應該與數值區域有相同的行數\n\n**重要：請務必只回傳純JSON格式，不要包含任何markdown標記、說明文字或其他內容。**\n\n回傳格式如下：\n[\n  {{\n    \"table_id\": 1,\n    \"description\": \"表格描述\",\n    \"values_range\": {{\n      \"start_row\": 起始行號,\n      \"end_row\": 結束行號,\n      \"start_col\": 起始欄號,\n      \"end_col\": 結束欄號\n    }},\n    \"columns_range\": {{\n      \"start_row\": 欄位標題起始行號,\n      \"end_row\": 欄位標題結束行號,\n      \"start_col\": 欄位標題起始欄號,\n      \"end_col\": 欄位標題結束欄號\n    }},\n    \"index_range\": {{\n      \"start_row\": 索引起始行號,\n      \"end_row\": 索引結束行號,\n      \"start_col\": 索引起始欄號,\n      \"end_col\": 索引結束欄號\n    }}\n  }}\n]\n\n工作表內容：\n{sheet_content}",
+  "example": {
+    "input": "A1: 項目, B1: 數值1, C1: 數值2\nA2: 項目1, B2: 10, C2: 20\nA3: 項目2, B3: 15, C3: 25",
+    "output": "[\n  {\n    \"table_id\": 1,\n    \"description\": \"純數字表格\",\n    \"values_range\": {\"start_row\": 2, \"end_row\": 3, \"start_col\": 2, \"end_col\": 3},\n    \"columns_range\": {\"start_row\": 1, \"end_row\": 1, \"start_col\": 2, \"end_col\": 3},\n    \"index_range\": {\"start_row\": 2, \"end_row\": 3, \"start_col\": 1, \"end_col\": 1}\n  }\n]"
+  }
+}

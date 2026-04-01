@@ -1,0 +1,16 @@
+*.txt
+*.log
+*.xlsx
+*.csv
+*bak
+*bak\
+*.bak
+*tmp\
+*outputs*
+*demo*
+*.md
+*.iss
+*bat
+*.env*
+tmp*
+*pyc*

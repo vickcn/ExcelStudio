@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExcelStudio Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
+  <link rel="stylesheet" href="/static/css/excelstudio_dashboard.css?v=20260402-6" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark">Σ</div>
+        <div>
+          <div class="brand-title">ExcelStudio</div>
+          <div class="brand-subtitle">Scientific Audit Console</div>
+        </div>
+      </div>
+
+      <section class="panel compact">
+        <div class="panel-title">API 連線</div>
+        <label class="field-label">Base URL</label>
+        <input id="apiBaseUrl" class="input" value="{{ api_base_url }}" />
+        <div class="row gap-sm mt-8">
+          <button id="btnCheckHealth" class="btn btn-secondary">檢查 Health</button>
+          <span id="healthDot" class="status-dot idle"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Excel 檔案</div>
+        <div class="upload-box" id="uploadDropzone">
+          <input id="fileInputExcel" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
+          <div class="upload-icon">⤴</div>
+          <div class="upload-title">拖曳檔案至此＝載入左表；右表請按下方「載入右表」（勿只點此區）</div>
+          <div class="upload-subtitle">支援 .xlsx / .xls / .xlsm / .csv</div>
+          <div class="row gap-sm mt-12">
+            <button type="button" id="btnPickFileLeft" class="btn btn-primary">載入左表</button>
+            <button type="button" id="btnPickFileRight" class="btn btn-secondary">載入右表</button>
+          </div>
+        </div>
+        <div id="uploadedFileInfo" class="file-info hidden"></div>
+        <div id="rulesFileInfo" class="file-info" data-default-path="{{ rules_file_path }}"></div>
+        <div class="row gap-sm mt-8 wrap">
+          <input id="rulesFileInput" type="file" accept=".json" hidden />
+          <button id="btnPickRulesFile" class="btn btn-secondary">上傳規則檔</button>
+          <button id="btnDownloadRulesFile" class="btn btn-ghost">下載規則檔</button>
+        </div>
+        <div class="row gap-sm mt-12 wrap">
+          <button id="btnParserPreview" class="btn btn-secondary">xlsx_parser 初步分析</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">分析流程</div>
+        <div class="action-grid">
+          <button id="btnRunRuleDiscovery" class="btn btn-primary">規則偵測</button>
+          <button id="btnRunAudit" class="btn btn-secondary">稽核主體</button>
+          <button id="btnRunFastMark" class="btn btn-secondary">Fast Mark</button>
+          <button id="btnRunRulesOnly" class="btn btn-secondary">Rules Only</button>
+          <button id="btnRunFullFlow" class="btn btn-accent full-span">完整流程</button>
+        </div>
+        <div class="panel-note">規則偵測：左檔</div>
+        <div class="panel-note">稽核主體：右檔</div>
+        <div class="panel-note">Fast Mark：右檔（使用已偵測規則）</div>
+        <div class="panel-note">Rules Only：右檔（使用已偵測規則）</div>
+        <div class="panel-note">完整流程：左檔偵測 + 右檔稽核</div>
+      </section>
+
+      <section class="panel compact quick-panel is-collapsed" id="quickPanel">
+        <div class="panel-header">
+          <div class="panel-title">快速參數</div>
+          <button id="toggleQuickPanel" class="btn btn-ghost" type="button" aria-expanded="false">></button>
+        </div>
+        <div class="quick-panel-body">
+          <div class="form-grid single">
+            <div>
+              <label class="field-label">Window Height</label>
+              <input id="windowHeight" type="number" class="input" value="3" />
+            </div>
+            <div>
+              <label class="field-label">Window Width</label>
+              <input id="windowWidth" type="number" class="input" value="1" />
+            </div>
+            <div>
+              <label class="field-label">Tolerance</label>
+              <input id="tolerance" type="number" step="0.0001" class="input" value="0.01" />
+            </div>
+            <div>
+              <label class="field-label">Consistency Threshold</label>
+              <input id="consistencyThreshold" type="number" step="0.01" class="input" value="0.8" />
+            </div>
+            <div>
+              <label class="field-label">Quick Scan Threshold</label>
+              <input id="quickScanThreshold" type="number" class="input" value="3" />
+            </div>
+            <div>
+              <label class="field-label">Row Name</label>
+              <input id="rowName" class="input" placeholder="可留空" />
+            </div>
+          </div>
+          <label class="checkbox mt-12"><input id="strictRowMatch" type="checkbox" checked /> <span>Strict Row Match</span></label>
+        </div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-header">
+        <div>
+          <h1>Scientific Workbook Workbench</h1>
+          <p>雙面 Excel 檢視、規則分析、稽核執行與結果追蹤</p>
+        </div>
+        <div class="header-actions">
+          <button id="btnExportLeftCsv" class="btn btn-ghost">匯出左表 CSV</button>
+          <button id="btnExportRightCsv" class="btn btn-ghost">匯出右表 CSV</button>
+        </div>
+      </header>
+
+      <section class="top-metrics">
+        <div class="metric-card">
+          <div class="metric-label">Sheets</div>
+          <div id="metricSheets" class="metric-value">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Tables</div>
+          <div id="metricTables" class="metric-value">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Images</div>
+          <div id="metricImages" class="metric-value">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Formulas</div>
+          <div id="metricFormulas" class="metric-value">0</div>
+        </div>
+      </section>
+
+      <section class="parser-panel is-collapsed" id="parserPanel">
+        <div class="panel-header">
+          <div class="panel-title">xlsx_parser 初步理解</div>
+          <button id="toggleParserPanel" class="btn btn-ghost" type="button" aria-expanded="false">></button>
+        </div>
+        <div class="parser-grid" id="parserGrid">
+          <div class="parser-box">
+            <div class="sub-title">Metadata</div>
+            <pre id="parserMetadata" class="code-box">尚未分析</pre>
+          </div>
+          <div class="parser-box">
+            <div class="sub-title">Preview</div>
+            <pre id="parserPreview" class="code-box">尚未分析</pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="table-sync-bar">
+        <div id="syncProgress" class="sync-progress" aria-hidden="true">
+          <div class="sync-progress-track">
+            <div class="sync-progress-bar"></div>
+          </div>
+          <div class="sync-progress-text">分析中…</div>
+        </div>
+        <div class="sync-actions">
+          <button id="btnSyncPanes" class="btn btn-ghost">同步欄列</button>
+          <button id="btnNextSuspect" class="btn btn-secondary">下一個疑慮點</button>
+        </div>
+      </div>
+      <section class="table-compare-layout">
+        <article class="table-panel">
+          <div class="table-toolbar">
+            <div>
+              <div class="panel-title">左側工作表</div>
+              <div class="toolbar-subtitle">可編輯 / 篩選 / 排序 / 匯出</div>
+            </div>
+            <div class="toolbar-controls">
+              <select id="leftSheetSelect" class="select"></select>
+              <button id="btnReloadLeft" class="btn btn-secondary">重載</button>
+            </div>
+          </div>
+          <div id="leftHot" class="hot-wrap"></div>
+          <div id="leftTableOverlay" class="table-overlay" aria-hidden="true">
+            <div class="spinner"></div>
+            <div class="overlay-text">分析中…</div>
+          </div>
+        </article>
+
+        <article class="table-panel">
+          <div class="table-toolbar">
+            <div>
+              <div class="panel-title">右側工作表</div>
+              <div class="toolbar-subtitle">可編輯 / 篩選 / 排序 / 匯出</div>
+            </div>
+            <div class="toolbar-controls">
+              <select id="rightSheetSelect" class="select"></select>
+              <button id="btnReloadRight" class="btn btn-secondary">重載</button>
+            </div>
+          </div>
+          <div id="rightHot" class="hot-wrap"></div>
+          <div id="rightTableOverlay" class="table-overlay" aria-hidden="true">
+            <div class="spinner"></div>
+            <div class="overlay-text">分析中…</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="result-layout">
+        <article class="result-panel">
+          <div class="panel-title">執行紀錄</div>
+          <div id="runLog" class="log-box"></div>
+        </article>
+        <article class="result-panel">
+          <div class="panel-title">API 回應</div>
+          <div class="result-toolbar">
+            <button id="btnShowRulesJson" class="btn btn-secondary">顯示規則 JSON</button>
+            <button id="btnClearApiResponse" class="btn btn-ghost">清除</button>
+          </div>
+          <pre id="apiResponseBox" class="code-box">尚未執行</pre>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div id="rulesJsonModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div id="rulesJsonModalBackdrop" class="modal-backdrop" aria-hidden="true"></div>
+    <div class="modal-card" role="document">
+      <div class="modal-header">
+        <div class="modal-title">規則 JSON（完整）</div>
+        <button id="rulesJsonModalClose" class="btn btn-ghost">關閉</button>
+      </div>
+      <pre id="rulesJsonModalContent" class="code-box modal-code">尚未載入</pre>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+  <script src="/static/js/excelstudio_api.js?v=20260402-5"></script>
+  <script src="/static/js/excelstudio_dashboard.js?v=20260402-10"></script>
+</body>
+</html>

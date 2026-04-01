@@ -1,0 +1,6 @@
+{
+  "system_prompt": "你是一個專業的數據分析專家，專門分析Excel表格中的數字規律。你的任務是判斷表格中數字的大小分佈是否有規律。",
+  "user_prompt_template": "請分析以下表格數據，判斷數字是否有明顯的規律。特別是每3個相鄰儲存格是否具備其中幾個加減乘除會得到第三者的規律：\n\n表格數據（axis=0，沿行的方向）：\n{axis0_data}\n\n表格數據（axis=1，沿列的方向）：\n{axis1_data}\n\n請判斷：\n1. 沿 axis=0（行方向）是否有高度規律？\n2. 沿 axis=1（列方向）是否有高度規律？\n\n請以JSON格式回傳結果，格式如下：\n{{\n  \"axis0_has_pattern\": true/false,\n  \"axis0_confidence\": 0.0-1.0,\n  \"axis0_description\": \"描述規律\",\n  \"axis1_has_pattern\": true/false,\n  \"axis1_confidence\": 0.0-1.0,\n  \"axis1_description\": \"描述規律\"\n}}\n\n只回傳JSON，不要有其他內容。",
+  "description": "高度規律偵測提示模板"
+}
+

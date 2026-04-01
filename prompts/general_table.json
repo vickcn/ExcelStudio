@@ -1,0 +1,8 @@
+{
+  "system_prompt": "你是一個專業的Excel表格分析專家，專門偵測廣義標準表格。請務必只回傳有效的JSON格式，不要添加任何其他文字或說明。",
+  "user_prompt": "請分析以下Excel工作表內容，找出所有符合廣義標準表格的區域。\n\n廣義標準表格定義：\n1. 允許包含非數字內容\n2. 缺失值比例不能高於{missing_ratio}（預設0.2）\n3. 必須能明顯形成表格結構\n4. 可能有欄位標題（columns）和索引標籤（index），也可能沒有\n\n**重要：請務必只回傳純JSON格式，不要包含任何markdown標記、說明文字或其他內容。**\n\n回傳格式如下：\n[\n  {{\n    \"table_id\": 1,\n    \"description\": \"表格描述\",\n    \"table_type\": \"general\",\n    \"missing_ratio\": 實際缺失值比例,\n    \"values_range\": {{\n      \"start_row\": 起始行號,\n      \"end_row\": 結束行號,\n      \"start_col\": 起始欄號,\n      \"end_col\": 結束欄號\n    }},\n    \"columns_range\": {{\n      \"start_row\": 欄位標題起始行號,\n      \"end_row\": 欄位標題結束行號,\n      \"start_col\": 欄位標題起始欄號,\n      \"end_col\": 欄位標題結束欄號\n    }},\n    \"index_range\": {{\n      \"start_row\": 索引起始行號,\n      \"end_row\": 索引結束行號,\n      \"start_col\": 索引起始欄號,\n      \"end_col\": 索引結束欄號\n    }}\n  }}\n]\n\n工作表內容：\n{sheet_content}",
+  "example": {
+    "input": "A1: 類別, B1: 名稱, C1: 數量\nA2: 電子, B2: 手機, C2: 100\nA3: 電子, B3: 電腦, C3: 50\nA4: 家具, B4: 桌子, C4: 20",
+    "output": "[\n  {\n    \"table_id\": 1,\n    \"description\": \"產品分類表格\",\n    \"table_type\": \"general\",\n    \"missing_ratio\": 0.0,\n    \"values_range\": {\"start_row\": 2, \"end_row\": 4, \"start_col\": 1, \"end_col\": 3},\n    \"columns_range\": {\"start_row\": 1, \"end_row\": 1, \"start_col\": 1, \"end_col\": 3},\n    \"index_range\": null\n  }\n]"
+  }
+}

@@ -1,0 +1,8 @@
+﻿{
+  "api_host": "10.1.3.127",
+  "api_port": 6330,
+  "templates_dir": "template",
+  "static_dir": "static",
+  "uploads_dir": "uploads",
+  "rules_file_path": "C:\\ML_HOME\\ExcelStudio\\outputs\\discovered_rules.json"
+}
