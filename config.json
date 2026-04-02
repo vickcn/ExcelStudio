@@ -4,5 +4,75 @@
   "templates_dir": "template",
   "static_dir": "static",
   "uploads_dir": "uploads",
-  "rules_file_path": "C:\\ML_HOME\\ExcelStudio\\outputs\\discovered_rules.json"
+  "rules_file_path": "C:\\ML_HOME\\ExcelStudio\\outputs\\discovered_rules.json",
+
+  "passed_rules_export": {
+    "enabled": true,
+    "source_rules_files": [
+      "C:\\ML_HOME\\ExcelStudio\\outputs\\discovered_rules_phase2_final.json",
+      "C:\\ML_HOME\\ExcelStudio\\outputs\\discovered_rules.json",
+      "C:\\ML_HOME\\ExcelStudio\\outputs\\discovered_rules_phase1.json"
+    ],
+    "prefer_prompt_field": "rule",
+    "fallback_prompt_field": "description",
+    "dedupe_by": "equation_and_prompt",
+    "min_consistency_rate": 0.0,
+    "keep_supporting_windows": false,
+    "output_json_path": "C:\\ML_HOME\\ExcelStudio\\outputs\\passed_rules_pointdata.json"
+  },
+
+  "//passed_rules_attr_filter": {
+    "attr_mode": "whitelist",
+    "attr_whitelist": [
+      "rule",
+      "description",
+      "equation",
+      "equation_sides",
+      "start_loc_row_name",
+      "start_loc_row_indicated",
+      "consistency_rate",
+      "valid_windows",
+      "total_windows",
+      "format",
+      "multi_prompts",
+      "tags",
+      "source",
+      "create_user",
+      "call_prompt",
+      "text"
+    ],
+    "attr_blacklist": []
+  },
+
+  "passed_rules_attr_filter": {
+    "attr_mode": "whitelist",
+    "attr_whitelist": [
+      "text",
+      "call_prompt",
+      "source",
+      "create_user",
+      "format",
+      "rule",
+      "description",
+      "equation",
+      "equation_sides",
+      "start_loc_row_name",
+      "start_loc_row_indicated",
+      "consistency_rate"
+    ],
+    "attr_blacklist": []
+  },
+
+  "document_manager_ingest": {
+    "collection_name": "excel_rules",
+    "create_user": "system",
+    "format": "excel_rule"
+  },
+
+  "document_manager_api": {
+    "base_url": "http://10.1.3.127:7021",
+    "endpoint": "/import/text_json_list_strictly",
+    "timeout": 600,
+    "dry_run": false
+  }
 }

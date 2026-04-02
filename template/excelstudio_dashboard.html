@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
-  <link rel="stylesheet" href="/static/css/excelstudio_dashboard.css?v=20260402-6" />
+  <link rel="stylesheet" href="/static/css/excelstudio_dashboard.css?v=20260402-9" />
 </head>
 <body>
   <div class="app-shell">
@@ -180,7 +180,17 @@
               <button id="btnReloadLeft" class="btn btn-secondary">重載</button>
             </div>
           </div>
+          <div class="annotation-controls">
+            <span class="annotation-label">浮動註解</span>
+            <select id="leftAnnotRowSelect" class="select select-sm">
+              <option value="">列索引</option>
+            </select>
+            <select id="leftAnnotColSelect" class="select select-sm">
+              <option value="">欄索引</option>
+            </select>
+          </div>
           <div id="leftHot" class="hot-wrap"></div>
+          <div id="leftAnnotTip" class="cell-annotation-tip" aria-hidden="true"></div>
           <div id="leftTableOverlay" class="table-overlay" aria-hidden="true">
             <div class="spinner"></div>
             <div class="overlay-text">分析中…</div>
@@ -198,7 +208,17 @@
               <button id="btnReloadRight" class="btn btn-secondary">重載</button>
             </div>
           </div>
+          <div class="annotation-controls">
+            <span class="annotation-label">浮動註解</span>
+            <select id="rightAnnotRowSelect" class="select select-sm">
+              <option value="">列索引</option>
+            </select>
+            <select id="rightAnnotColSelect" class="select select-sm">
+              <option value="">欄索引</option>
+            </select>
+          </div>
           <div id="rightHot" class="hot-wrap"></div>
+          <div id="rightAnnotTip" class="cell-annotation-tip" aria-hidden="true"></div>
           <div id="rightTableOverlay" class="table-overlay" aria-hidden="true">
             <div class="spinner"></div>
             <div class="overlay-text">分析中…</div>
@@ -207,17 +227,27 @@
       </section>
 
       <section class="result-layout">
-        <article class="result-panel">
-          <div class="panel-title">執行紀錄</div>
-          <div id="runLog" class="log-box"></div>
-        </article>
-        <article class="result-panel">
-          <div class="panel-title">API 回應</div>
-          <div class="result-toolbar">
-            <button id="btnShowRulesJson" class="btn btn-secondary">顯示規則 JSON</button>
-            <button id="btnClearApiResponse" class="btn btn-ghost">清除</button>
+        <article class="result-panel log-panel is-collapsed" id="logPanel">
+          <div class="panel-header">
+            <div class="panel-title">執行紀錄</div>
+            <button id="toggleLogPanel" class="btn btn-ghost" type="button" aria-expanded="false">></button>
           </div>
-          <pre id="apiResponseBox" class="code-box">尚未執行</pre>
+          <div class="log-panel-body">
+            <div id="runLog" class="log-box"></div>
+          </div>
+        </article>
+        <article class="result-panel api-panel is-collapsed" id="apiPanel">
+          <div class="panel-header">
+            <div class="panel-title">API 回應</div>
+            <button id="toggleApiPanel" class="btn btn-ghost" type="button" aria-expanded="false">></button>
+          </div>
+          <div class="api-panel-body">
+            <div class="result-toolbar">
+              <button id="btnShowRulesJson" class="btn btn-secondary">顯示規則 JSON</button>
+              <button id="btnClearApiResponse" class="btn btn-ghost">清除</button>
+            </div>
+            <pre id="apiResponseBox" class="code-box">尚未執行</pre>
+          </div>
         </article>
       </section>
     </main>
@@ -238,6 +268,6 @@
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
   <script src="/static/js/excelstudio_api.js?v=20260402-5"></script>
-  <script src="/static/js/excelstudio_dashboard.js?v=20260402-10"></script>
+  <script src="/static/js/excelstudio_dashboard.js?v=20260402-15"></script>
 </body>
 </html>

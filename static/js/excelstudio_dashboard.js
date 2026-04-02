@@ -1,8 +1,8 @@
 (() => {
   const state = {
     parserResult: null,
-    left: { hot: null, sheetName: null, workbook: null, file: null, workbookName: '', serverPath: '' },
-    right: { hot: null, sheetName: null, workbook: null, file: null, workbookName: '', serverPath: '' },
+    left: { hot: null, sheetName: null, workbook: null, file: null, workbookName: '', serverPath: '', annotRowIndex: null, annotColIndex: null },
+    right: { hot: null, sheetName: null, workbook: null, file: null, workbookName: '', serverPath: '', annotRowIndex: null, annotColIndex: null },
     rulesFilePath: '',
     suspect: { sheetName: null, cells: [], index: -1 },
     syncScroll: { enabled: false, leftHandler: null, rightHandler: null, leftHolder: null, rightHolder: null },
@@ -25,6 +25,12 @@
     metricFormulas: $('metricFormulas'),
     leftSheetSelect: $('leftSheetSelect'),
     rightSheetSelect: $('rightSheetSelect'),
+    leftAnnotRowSelect: $('leftAnnotRowSelect'),
+    leftAnnotColSelect: $('leftAnnotColSelect'),
+    rightAnnotRowSelect: $('rightAnnotRowSelect'),
+    rightAnnotColSelect: $('rightAnnotColSelect'),
+    leftAnnotTip: $('leftAnnotTip'),
+    rightAnnotTip: $('rightAnnotTip'),
     leftTableOverlay: $('leftTableOverlay'),
     rightTableOverlay: $('rightTableOverlay'),
     syncProgress: $('syncProgress'),
@@ -218,6 +224,155 @@
     updateRulesFileInfo();
   }
 
+  function isEmptyValue(value) {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    return false;
+  }
+
+  function toExcelColLabel(index) {
+    let n = index + 1;
+    let label = '';
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      label = String.fromCharCode(65 + rem) + label;
+      n = Math.floor((n - 1) / 26);
+    }
+    return label;
+  }
+
+  function getNonEmptyRowIndices(data) {
+    if (!Array.isArray(data)) return [];
+    const indices = [];
+    data.forEach((row, r) => {
+      if (!Array.isArray(row)) return;
+      const hasValue = row.some(cell => !isEmptyValue(cell));
+      if (hasValue) indices.push(r);
+    });
+    return indices;
+  }
+
+  function getNonEmptyColIndices(data) {
+    if (!Array.isArray(data) || data.length === 0) return [];
+    const maxCols = Math.max(...data.map(row => (Array.isArray(row) ? row.length : 0)), 0);
+    const indices = [];
+    for (let c = 0; c < maxCols; c += 1) {
+      let hasValue = false;
+      for (let r = 0; r < data.length; r += 1) {
+        const row = data[r];
+        if (Array.isArray(row) && !isEmptyValue(row[c])) {
+          hasValue = true;
+          break;
+        }
+      }
+      if (hasValue) indices.push(c);
+    }
+    return indices;
+  }
+
+  function setSelectOptions(select, indices, labelFn) {
+    if (!select) return;
+    const prev = select.value;
+    select.innerHTML = '';
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = select.dataset?.placeholder || '';
+    select.appendChild(emptyOpt);
+    indices.forEach((idx) => {
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      opt.textContent = labelFn(idx);
+      select.appendChild(opt);
+    });
+    if (prev && indices.includes(Number(prev))) {
+      select.value = prev;
+    } else {
+      select.value = '';
+    }
+  }
+
+  function updateAnnotationOptions(side, data) {
+    const paneState = state[side];
+    const rowSelect = side === 'left' ? els.leftAnnotRowSelect : els.rightAnnotRowSelect;
+    const colSelect = side === 'left' ? els.leftAnnotColSelect : els.rightAnnotColSelect;
+    if (rowSelect) rowSelect.dataset.placeholder = '列索引';
+    if (colSelect) colSelect.dataset.placeholder = '欄索引';
+    const rowIndices = getNonEmptyRowIndices(data);
+    const colIndices = getNonEmptyColIndices(data);
+    setSelectOptions(rowSelect, rowIndices, (r) => `列 ${r + 1}`);
+    setSelectOptions(colSelect, colIndices, (c) => `欄 ${toExcelColLabel(c)}`);
+
+    const rowValue = rowSelect?.value;
+    const colValue = colSelect?.value;
+    paneState.annotRowIndex = rowValue === '' ? null : Number(rowValue);
+    paneState.annotColIndex = colValue === '' ? null : Number(colValue);
+  }
+
+  function bindAnnotationControls() {
+    const bindSide = (side) => {
+      const paneState = state[side];
+      const rowSelect = side === 'left' ? els.leftAnnotRowSelect : els.rightAnnotRowSelect;
+      const colSelect = side === 'left' ? els.leftAnnotColSelect : els.rightAnnotColSelect;
+      rowSelect?.addEventListener('change', () => {
+        paneState.annotRowIndex = rowSelect.value === '' ? null : Number(rowSelect.value);
+      });
+      colSelect?.addEventListener('change', () => {
+        paneState.annotColIndex = colSelect.value === '' ? null : Number(colSelect.value);
+      });
+    };
+    bindSide('left');
+    bindSide('right');
+  }
+
+  function hideAnnotationTip(side) {
+    const tip = side === 'left' ? els.leftAnnotTip : els.rightAnnotTip;
+    if (!tip) return;
+    tip.classList.remove('is-active');
+    tip.setAttribute('aria-hidden', 'true');
+  }
+
+  function showAnnotationTip(side, row, col, td) {
+    const paneState = state[side];
+    const tip = side === 'left' ? els.leftAnnotTip : els.rightAnnotTip;
+    if (!tip || !paneState?.hot) return;
+
+    const rowIdx = paneState.annotRowIndex;
+    const colIdx = paneState.annotColIndex;
+    if (rowIdx === null && colIdx === null) {
+      hideAnnotationTip(side);
+      return;
+    }
+
+    const data = paneState.hot.getData() || [];
+    const lines = [];
+    if (rowIdx !== null) {
+      const value = data?.[rowIdx]?.[col];
+      const text = isEmptyValue(value) ? '' : String(value);
+      if (text !== '') lines.push(text);
+    }
+    if (colIdx !== null) {
+      const value = data?.[row]?.[colIdx];
+      const text = isEmptyValue(value) ? '' : String(value);
+      if (text !== '') lines.push(text);
+    }
+    if (!lines.length) {
+      hideAnnotationTip(side);
+      return;
+    }
+
+    tip.innerHTML = lines.map(line => `<div>${escapeHtml(line)}</div>`).join('');
+    const tdRect = td.getBoundingClientRect();
+    const panelRect = paneState.hot.rootElement?.closest('.table-panel')?.getBoundingClientRect();
+    if (panelRect) {
+      const left = tdRect.left - panelRect.left + 12;
+      const top = tdRect.top - panelRect.top + 12;
+      tip.style.left = `${Math.max(8, left)}px`;
+      tip.style.top = `${Math.max(8, top)}px`;
+    }
+    tip.classList.add('is-active');
+    tip.setAttribute('aria-hidden', 'false');
+  }
+
   async function downloadRulesFile() {
     const baseUrl = window.ExcelStudioApi.getBaseUrl();
     if (!baseUrl) {
@@ -373,16 +528,27 @@
         if (!changes || source === 'loadData') return;
         syncPaneBackToWorkbook(side);
       },
+      afterOnCellMouseOver: (event, coords, td) => {
+        if (!td) return;
+        if (coords.row < 0 || coords.col < 0) return;
+        showAnnotationTip(side, coords.row, coords.col, td);
+      },
+      afterOnCellMouseOut: () => {
+        hideAnnotationTip(side);
+      },
     });
     paneState.sheetName = sheetName;
     if (side === 'left') els.leftSheetSelect.value = sheetName;
     if (side === 'right') els.rightSheetSelect.value = sheetName;
+    updateAnnotationOptions(side, dataClone);
     applySuspectToPane(paneState, sheetName);
     if (state.syncScroll.enabled) {
       disableScrollSync();
       enableScrollSync();
     }
   }
+
+  bindAnnotationControls();
 
   function clearSuspectFromPane(paneState) {
     if (!paneState?.hot || !paneState.suspectCells?.length) return;
@@ -543,15 +709,21 @@
     }
   }
 
-  function exportPaneCsv(side) {
+  function exportPaneXlsx(side) {
     const paneState = state[side];
     if (!paneState.hot || !paneState.sheetName) return;
     const aoa = paneState.hot.getData();
     const sheet = XLSX.utils.aoa_to_sheet(aoa);
-    const csv = XLSX.utils.sheet_to_csv(sheet);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `${paneState.workbookName || 'workbook'}_${paneState.sheetName}_${side}.csv`);
-    log(`已匯出${side === 'left' ? '左表' : '右表'} CSV: ${paneState.sheetName}`);
+    const wb = XLSX.utils.book_new();
+    const sheetName = paneState.sheetName || (side === 'left' ? '左表' : '右表');
+    XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+    const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbArray], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const filename = side === 'left' ? '左表.xlsx' : '右表.xlsx';
+    saveAs(blob, filename);
+    log(`已匯出${side === 'left' ? '左表' : '右表'} Excel: ${sheetName}`);
   }
 
   async function runParserPreview() {
@@ -784,8 +956,8 @@
     $('btnReloadRight').addEventListener('click', () => state.right.sheetName && renderSheetToPane('right', state.right.sheetName));
     $('btnSyncPanes').addEventListener('click', syncPaneViewport);
     $('btnNextSuspect').addEventListener('click', jumpToNextSuspect);
-    $('btnExportLeftCsv').addEventListener('click', () => exportPaneCsv('left'));
-    $('btnExportRightCsv').addEventListener('click', () => exportPaneCsv('right'));
+    $('btnExportLeftCsv').addEventListener('click', () => exportPaneXlsx('left'));
+    $('btnExportRightCsv').addEventListener('click', () => exportPaneXlsx('right'));
 
     $('btnRunRuleDiscovery').addEventListener('click', () => runAction('ruleDiscovery'));
     $('btnRunAudit').addEventListener('click', () => runAction('audit'));
@@ -834,10 +1006,44 @@
     updateLabel();
   }
 
+  function initApiPanelToggle() {
+    const panel = document.getElementById('apiPanel');
+    const toggle = document.getElementById('toggleApiPanel');
+    if (!panel || !toggle) return;
+    const updateLabel = () => {
+      const collapsed = panel.classList.contains('is-collapsed');
+      toggle.textContent = collapsed ? '>' : 'v';
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+    };
+    toggle.addEventListener('click', () => {
+      panel.classList.toggle('is-collapsed');
+      updateLabel();
+    });
+    updateLabel();
+  }
+
+  function initLogPanelToggle() {
+    const panel = document.getElementById('logPanel');
+    const toggle = document.getElementById('toggleLogPanel');
+    if (!panel || !toggle) return;
+    const updateLabel = () => {
+      const collapsed = panel.classList.contains('is-collapsed');
+      toggle.textContent = collapsed ? '>' : 'v';
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+    };
+    toggle.addEventListener('click', () => {
+      panel.classList.toggle('is-collapsed');
+      updateLabel();
+    });
+    updateLabel();
+  }
+
   bindFileUi();
   bindActions();
   initQuickPanelToggle();
   initParserPanelToggle();
+  initApiPanelToggle();
+  initLogPanelToggle();
   checkHealth();
 })();
 
