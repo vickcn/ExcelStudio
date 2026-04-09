@@ -14,3 +14,9 @@
 *.env*
 tmp*
 *pyc*
+
+*\analysis_result*.json
+*\timer*.json
+*\discoverred_rules*.json
+*output*\
+issues\*
