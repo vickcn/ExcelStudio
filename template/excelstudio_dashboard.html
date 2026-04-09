@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
-  <link rel="stylesheet" href="/static/css/excelstudio_dashboard.css?v=20260402-9" />
+  <link rel="stylesheet" href="/static/css/excelstudio_dashboard.css?v=20260402-10" />
 </head>
 <body>
   <div class="app-shell">
@@ -161,11 +161,12 @@
           <div class="sync-progress-track">
             <div class="sync-progress-bar"></div>
           </div>
-          <div class="sync-progress-text">分析中…</div>
+          <div id="syncProgressText" class="sync-progress-text">分析中 0%</div>
         </div>
         <div class="sync-actions">
           <button id="btnSyncPanes" class="btn btn-ghost">同步欄列</button>
           <button id="btnNextSuspect" class="btn btn-secondary">下一個疑慮點</button>
+          <button id="btnStopTask" class="btn btn-danger" disabled>中止</button>
         </div>
       </div>
       <section class="table-compare-layout">
@@ -268,6 +269,6 @@
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
   <script src="/static/js/excelstudio_api.js?v=20260402-5"></script>
-  <script src="/static/js/excelstudio_dashboard.js?v=20260402-15"></script>
+  <script src="/static/js/excelstudio_dashboard.js?v=20260402-16"></script>
 </body>
 </html>

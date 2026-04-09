@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   const state = {
     parserResult: null,
     left: { hot: null, sheetName: null, workbook: null, file: null, workbookName: '', serverPath: '', annotRowIndex: null, annotColIndex: null },
@@ -6,6 +6,7 @@
     rulesFilePath: '',
     suspect: { sheetName: null, cells: [], index: -1 },
     syncScroll: { enabled: false, leftHandler: null, rightHandler: null, leftHolder: null, rightHolder: null },
+    task: { id: null, action: null, polling: null, status: 'idle' },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -34,6 +35,7 @@
     leftTableOverlay: $('leftTableOverlay'),
     rightTableOverlay: $('rightTableOverlay'),
     syncProgress: $('syncProgress'),
+    syncProgressText: $('syncProgressText'),
     apiResponseBox: $('apiResponseBox'),
     runLog: $('runLog'),
     rulesJsonModal: $('rulesJsonModal'),
@@ -51,6 +53,7 @@
     btnPickFileRight: $('btnPickFileRight'),
     btnPickRulesFile: $('btnPickRulesFile'),
     btnDownloadRulesFile: $('btnDownloadRulesFile'),
+    btnStopTask: $('btnStopTask'),
   };
 
   function log(message, level = 'INFO') {
@@ -96,10 +99,26 @@
       .replace(/'/g, '&#039;');
   }
 
-  function setWorkInProgress(flag) {
+  function setActionButtonsDisabled(flag) {
+    els.actionButtons?.forEach(btn => btn && (btn.disabled = flag));
+  }
+
+  function setWorkInProgress(flag, options = {}) {
+    const { message = '??銝?, percent = 0, canStop = false } = options;
     if (els.syncProgress) {
       els.syncProgress.classList.toggle('is-active', flag);
       els.syncProgress.setAttribute('aria-hidden', String(!flag));
+    }
+    if (els.syncProgressText) {
+      if (flag) {
+        const pct = Number.isFinite(percent) ? Math.round(percent) : 0;
+        els.syncProgressText.textContent = `${message} ${pct}%`;
+      } else {
+        els.syncProgressText.textContent = '??銝?0%';
+      }
+    }
+    if (els.btnStopTask) {
+      els.btnStopTask.disabled = !canStop;
     }
     [els.leftTableOverlay, els.rightTableOverlay].forEach((overlay) => {
       if (!overlay) return;
@@ -113,11 +132,11 @@
       const data = await window.ExcelStudioApi.health();
       els.healthDot.className = 'status-dot ok';
       setApiResponse(data);
-      log('API health 檢查成功');
+      log('API health 瑼Ｘ??');
     } catch (err) {
       els.healthDot.className = 'status-dot fail';
       setApiResponse(err.message || String(err));
-      log(`API health 檢查失敗: ${err.message || err}`, 'ERROR');
+      log(`API health 瑼Ｘ憭望?: ${err.message || err}`, 'ERROR');
     }
   }
 
@@ -168,7 +187,7 @@
       const file = inp.files?.[0];
       if (inp && inp.dataset) delete inp.dataset.pickSide;
       if (file) {
-        log(side === 'left' ? `已選擇左表檔案：${file.name}` : `已選擇右表檔案：${file.name}`);
+        log(side === 'left' ? `撌脤?椰銵冽?獢?${file.name}` : `撌脤?銵冽?獢?${file.name}`);
         await loadWorkbook(file, side);
         inp.value = '';
       }
@@ -187,22 +206,22 @@
     els.rulesFileInput?.addEventListener('change', async (e) => {
       const file = e.target?.files?.[0];
       if (!file) return;
-      log(`已選擇規則檔：${file.name}`);
+      log(`撌脤????嚗?{file.name}`);
       try {
         const result = await window.ExcelStudioApi.uploadRulesFile(file);
         if (result?.path) {
           state.rulesFilePath = result.path;
           updateRulesFileInfo();
         }
-        log(`規則檔已上傳：${result?.path || file.name}`);
+        log(`閬?瑼歇銝嚗?{result?.path || file.name}`);
       } catch (err) {
-        log(`規則檔上傳失敗: ${err.message || err}`, 'ERROR');
+        log(`閬?瑼??喳仃?? ${err.message || err}`, 'ERROR');
       } finally {
         e.target.value = '';
       }
     });
 
-    // 勿在空白上傳區 click 開檔：使用者第二次常點標題/圖示，舊版會強制當左表。右表請按「載入右表」；左表請按「載入左表」或拖曳至此。
+    // ?踹蝛箇銝? click ??嚗蝙?刻洵鈭活撣賊?璅?/?內嚗???撘瑕?嗅椰銵具銵刻????亙銵具?撌西”隢????亙椰銵具???單迨??
 
     ['dragenter', 'dragover'].forEach(eventName => {
       els.uploadDropzone.addEventListener(eventName, (e) => {
@@ -295,12 +314,12 @@
     const paneState = state[side];
     const rowSelect = side === 'left' ? els.leftAnnotRowSelect : els.rightAnnotRowSelect;
     const colSelect = side === 'left' ? els.leftAnnotColSelect : els.rightAnnotColSelect;
-    if (rowSelect) rowSelect.dataset.placeholder = '列索引';
-    if (colSelect) colSelect.dataset.placeholder = '欄索引';
+    if (rowSelect) rowSelect.dataset.placeholder = '?揣撘?;
+    if (colSelect) colSelect.dataset.placeholder = '甈揣撘?;
     const rowIndices = getNonEmptyRowIndices(data);
     const colIndices = getNonEmptyColIndices(data);
-    setSelectOptions(rowSelect, rowIndices, (r) => `列 ${r + 1}`);
-    setSelectOptions(colSelect, colIndices, (c) => `欄 ${toExcelColLabel(c)}`);
+    setSelectOptions(rowSelect, rowIndices, (r) => `??${r + 1}`);
+    setSelectOptions(colSelect, colIndices, (c) => `甈?${toExcelColLabel(c)}`);
 
     const rowValue = rowSelect?.value;
     const colValue = colSelect?.value;
@@ -376,7 +395,7 @@
   async function downloadRulesFile() {
     const baseUrl = window.ExcelStudioApi.getBaseUrl();
     if (!baseUrl) {
-      log('API Base URL 未設定', 'WARN');
+      log('API Base URL ?芾身摰?, 'WARN');
       return;
     }
     const url = `${baseUrl}/api/rules/download`;
@@ -385,7 +404,7 @@
       if (!resp.ok) {
         let detail = '';
         try { detail = await resp.text(); } catch {}
-        throw new Error(detail || `下載規則檔失敗: ${resp.status}`);
+        throw new Error(detail || `銝?閬?瑼仃?? ${resp.status}`);
       }
       const blob = await resp.blob();
       const disposition = resp.headers.get('content-disposition') || '';
@@ -400,9 +419,9 @@
       link.click();
       link.remove();
       URL.revokeObjectURL(href);
-      log(`規則檔已下載：${filename}`);
+      log(`閬?瑼歇銝?嚗?{filename}`);
     } catch (err) {
-      log(`規則檔下載失敗: ${err.message || err}`, 'ERROR');
+      log(`閬?瑼?頛仃?? ${err.message || err}`, 'ERROR');
     }
   }
 
@@ -414,16 +433,16 @@
       els.uploadedFileInfo.innerHTML = '';
       return;
     }
-    const leftName = leftFile ? escapeHtml(leftFile.name) : '尚未載入';
-    const rightName = rightFile ? escapeHtml(rightFile.name) : '尚未載入';
+    const leftName = leftFile ? escapeHtml(leftFile.name) : '撠頛';
+    const rightName = rightFile ? escapeHtml(rightFile.name) : '撠頛';
     const leftSize = leftFile ? `${(leftFile.size / 1024).toFixed(1)} KB` : '-';
     const rightSize = rightFile ? `${(rightFile.size / 1024).toFixed(1)} KB` : '-';
     const leftSheets = state.left.workbook?.SheetNames?.length ?? 0;
     const rightSheets = state.right.workbook?.SheetNames?.length ?? 0;
     els.uploadedFileInfo.classList.remove('hidden');
     els.uploadedFileInfo.innerHTML = [
-      `左表: <b>${leftName}</b>（${leftSize}，工作表數: ${leftSheets}）`,
-      `右表: <b>${rightName}</b>（${rightSize}，工作表數: ${rightSheets}）`,
+      `撌西”: <b>${leftName}</b>嚗?{leftSize}嚗極雿”?? ${leftSheets}嚗,
+      `?唾”: <b>${rightName}</b>嚗?{rightSize}嚗極雿”?? ${rightSheets}嚗,
     ].join('<br>');
   }
 
@@ -433,9 +452,9 @@
     if (!state.rulesFilePath && defaultPath) {
       state.rulesFilePath = defaultPath;
     }
-    const displayPath = state.rulesFilePath || defaultPath || '尚未設定';
+    const displayPath = state.rulesFilePath || defaultPath || '撠閮剖?';
     els.rulesFileInfo.classList.remove('hidden');
-    els.rulesFileInfo.textContent = `規則檔: ${displayPath}`;
+    els.rulesFileInfo.textContent = `閬?瑼? ${displayPath}`;
   }
 
   function getSheetPayload(side) {
@@ -463,7 +482,7 @@
     fillSheetSelect(side, names);
     if (names[0]) {
       renderSheetToPane(side, names[0]);
-      log(`已載入${side === 'left' ? '左表' : '右表'} Excel: ${file.name}，工作表數=${names.length}`);
+      log(`撌脰???{side === 'left' ? '撌西”' : '?唾”'} Excel: ${file.name}嚗極雿”??${names.length}`);
     }
   }
 
@@ -498,7 +517,7 @@
   function renderSheetToPane(side, sheetName) {
     const paneState = state[side];
     if (!paneState.workbook) {
-      log(`尚未載入${side === 'left' ? '左表' : '右表'} Excel`, 'WARN');
+      log(`撠頛${side === 'left' ? '撌西”' : '?唾”'} Excel`, 'WARN');
       return;
     }
     const data = sheetToAoa(side, sheetName);
@@ -587,13 +606,13 @@
   function updateSyncButton() {
     const btn = $('btnSyncPanes');
     if (!btn) return;
-    btn.textContent = state.syncScroll.enabled ? '解除同步' : '同步欄列';
+    btn.textContent = state.syncScroll.enabled ? '閫??郊' : '?郊甈?';
   }
 
   function enableScrollSync() {
     const holders = getScrollHolders();
     if (!holders) {
-      log('左右表尚未載入或無法取得捲動容器', 'WARN');
+      log('撌血銵典??芾??交??⊥????脣?摰孵', 'WARN');
       return;
     }
     const { leftHolder, rightHolder } = holders;
@@ -621,7 +640,7 @@
     state.syncScroll.rightHolder = rightHolder;
     updateSyncButton();
     syncFromLeft();
-    log('已啟用欄列同步');
+    log('撌脣??冽???甇?);
   }
 
   function disableScrollSync() {
@@ -638,7 +657,7 @@
     state.syncScroll.leftHolder = null;
     state.syncScroll.rightHolder = null;
     updateSyncButton();
-    log('已解除欄列同步');
+    log('撌脰圾?斗???甇?);
   }
 
   function syncPaneViewport() {
@@ -672,12 +691,12 @@
     const cells = state.suspect.cells || [];
     const sheetName = state.suspect.sheetName;
     if (!sheetName || cells.length === 0) {
-      window.alert('沒有疑慮點');
+      window.alert('瘝??暺?);
       return;
     }
     let nextIndex = state.suspect.index + 1;
     if (nextIndex >= cells.length) {
-      window.alert('已經沒有其他疑慮點');
+      window.alert('撌脩?瘝??嗡??暺?);
       nextIndex = 0;
     }
     state.suspect.index = nextIndex;
@@ -715,21 +734,21 @@
     const aoa = paneState.hot.getData();
     const sheet = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
-    const sheetName = paneState.sheetName || (side === 'left' ? '左表' : '右表');
+    const sheetName = paneState.sheetName || (side === 'left' ? '撌西”' : '?唾”');
     XLSX.utils.book_append_sheet(wb, sheet, sheetName);
     const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([wbArray], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    const filename = side === 'left' ? '左表.xlsx' : '右表.xlsx';
+    const filename = side === 'left' ? '撌西”.xlsx' : '?唾”.xlsx';
     saveAs(blob, filename);
-    log(`已匯出${side === 'left' ? '左表' : '右表'} Excel: ${sheetName}`);
+    log(`撌脣??{side === 'left' ? '撌西”' : '?唾”'} Excel: ${sheetName}`);
   }
 
   async function runParserPreview() {
     const sourceSide = state.left.file ? 'left' : (state.right.file ? 'right' : null);
     if (!sourceSide) {
-      log('尚未載入左表或右表 Excel', 'WARN');
+      log('撠頛撌西”?銵?Excel', 'WARN');
       return;
     }
     const sourceState = state[sourceSide];
@@ -745,7 +764,7 @@
     });
 
     els.parserMetadata.textContent = JSON.stringify({
-      note: `此處顯示${sourceSide === 'left' ? '左表' : '右表'}可讀取的 workbook 結構；正式串接時請改呼叫 xlsx_parser process/preview API 回傳內容`,
+      note: `甇方?憿舐內${sourceSide === 'left' ? '撌西”' : '?唾”'}?航??? workbook 蝯?嚗迤撘葡?交?隢?澆 xlsx_parser process/preview API ??批捆`,
       ...basic,
     }, null, 2);
     els.parserPreview.textContent = JSON.stringify(previewData, null, 2);
@@ -756,7 +775,7 @@
     els.metricImages.textContent = '-';
     els.metricFormulas.textContent = '-';
 
-    log(`已完成${sourceSide === 'left' ? '左表' : '右表'} workbook 初步分析（尚未串接 xlsx_parser API）`);
+    log(`撌脣???{sourceSide === 'left' ? '撌西”' : '?唾”'} workbook ?郊??嚗??芯葡??xlsx_parser API嚗);
   }
 
   function getCommonParams() {
@@ -775,12 +794,133 @@
     return `outputs/${name}`;
   }
 
+  function clearTaskPolling() {
+    if (state.task.polling) {
+      clearInterval(state.task.polling);
+      state.task.polling = null;
+    }
+  }
+
+  function resetTaskState() {
+    state.task.id = null;
+    state.task.action = null;
+    state.task.status = 'idle';
+  }
+
+  async function pollTaskProgress() {
+    if (!state.task.id) return;
+    try {
+      const data = await window.ExcelStudioApi.taskProgress(state.task.id);
+      if (!data?.success) return;
+      const status = data.status || 'running';
+      const percent = Number.isFinite(data.progress) ? data.progress : 0;
+      const message = status === 'cancel_requested' ? '銝剜迫銝? : (data.message || '??銝?);
+      const canStop = status === 'running';
+      setWorkInProgress(true, { message, percent, canStop });
+      state.task.status = status;
+
+      if (status === 'done') {
+        clearTaskPolling();
+        setWorkInProgress(false);
+        setActionButtonsDisabled(false);
+        applyActionResult(state.task.action, data.result);
+        resetTaskState();
+      } else if (status === 'error') {
+        clearTaskPolling();
+        setWorkInProgress(false);
+        setActionButtonsDisabled(false);
+        setApiResponse(data.error || data.message || '隞餃?憭望?');
+        log(`${state.task.action} 憭望?: ${data.message || 'unknown error'}`, 'ERROR');
+        resetTaskState();
+      } else if (status === 'cancelled') {
+        clearTaskPolling();
+        setWorkInProgress(false);
+        setActionButtonsDisabled(false);
+        log('隞餃?撌脖葉甇?, 'WARN');
+        resetTaskState();
+      }
+    } catch (err) {
+      log(`?脣漲?亥岷憭望?: ${err.message || err}`, 'ERROR');
+    }
+  }
+
+  async function startTask(action, payload, endpoint, baseUrl, leftName, rightName) {
+    setApiResponse(payload);
+    log(`?瑁? ${action} API ?澆 -> ${endpoint} ${baseUrl ? `(${baseUrl})` : ''} | 撌行?=${leftName} ?單?=${rightName}`);
+    try {
+      const result = await window.ExcelStudioApi.taskStart(action, payload);
+      if (!result?.task_id) {
+        throw new Error('task_id 蝻箏仃嚗瘜蕭頩日脣漲');
+      }
+      state.task.id = result.task_id;
+      state.task.action = action;
+      state.task.status = 'running';
+      setWorkInProgress(true, { message: '??銝?, percent: 1, canStop: true });
+      clearTaskPolling();
+      state.task.polling = setInterval(pollTaskProgress, 1000);
+      await pollTaskProgress();
+    } catch (err) {
+      setApiResponse(err.message || String(err));
+      log(`${action} ??憭望?: ${err.message || err}`, 'ERROR');
+      setWorkInProgress(false);
+      setActionButtonsDisabled(false);
+      resetTaskState();
+    }
+  }
+
+  async function stopCurrentTask() {
+    if (!state.task.id) {
+      log('?桀?瘝??瑁?銝剔?隞餃?', 'WARN');
+      return;
+    }
+    try {
+      await window.ExcelStudioApi.taskStop(state.task.id);
+      log('撌脤銝剜迫隢?');
+    } catch (err) {
+      log(`銝剜迫憭望?: ${err.message || err}`, 'ERROR');
+    }
+  }
+
+  function applyActionResult(action, result) {
+    if (result !== undefined) {
+      setApiResponse(result);
+    }
+    if ((action === 'ruleDiscovery' || action === 'fullFlow') && result?.detect_rules_file) {
+      state.rulesFilePath = result.detect_rules_file;
+      updateRulesFileInfo();
+      log(`閬?瑼歇?湔: ${result.detect_rules_file}`);
+    } else if (action === 'fullFlow' && result?.discovery?.detect_rules_file) {
+      state.rulesFilePath = result.discovery.detect_rules_file;
+      updateRulesFileInfo();
+      log(`閬?瑼歇?湔: ${result.discovery.detect_rules_file}`);
+    }
+    log(`${action} 摰?`);
+    if (['audit', 'fullFlow', 'markFast', 'rulesOnly'].includes(action)) {
+      const sheetName = result?.suspect_sheet || result?.mark_summary?.suspect_sheet || null;
+      const cells = result?.suspect_cells || result?.mark_summary?.suspect_cells || [];
+      if (sheetName && Array.isArray(cells)) {
+        state.suspect.sheetName = sheetName;
+        state.suspect.cells = cells;
+        state.suspect.index = -1;
+        applySuspectToPane(state.left, state.left.sheetName);
+        applySuspectToPane(state.right, state.right.sheetName);
+        log(`??脣??? ${cells.length}`);
+      } else {
+        state.suspect.sheetName = null;
+        state.suspect.cells = [];
+        state.suspect.index = -1;
+        clearSuspectFromPane(state.left);
+        clearSuspectFromPane(state.right);
+      }
+    }
+  }
+
   async function runAction(action) {
-    const setBusy = (flag) => {
-      els.actionButtons?.forEach(btn => btn && (btn.disabled = flag));
-      setWorkInProgress(flag);
-    };
-    setBusy(true);
+    if (state.task.id) {
+      log('已有任務執行中，請先完成或中止', 'WARN');
+      return;
+    }
+    setActionButtonsDisabled(true);
 
     const endpointMap = {
       ruleDiscovery: '/api/rules/discover-json',
@@ -796,28 +936,27 @@
     const leftPayload = getSheetPayload('left');
     const rightPayload = getSheetPayload('right');
     if (action === 'ruleDiscovery' && !leftPayload) {
-      log('規則偵測需要左表檔案，請先載入左表。', 'WARN');
-      setBusy(false);
+      log('規則偵測需要左表資料', 'WARN');
+      setActionButtonsDisabled(false);
       return;
     }
     if (['audit', 'markFast', 'rulesOnly'].includes(action) && !rightPayload) {
-      log('稽核需要右表檔案，請先載入右表。', 'WARN');
-      setBusy(false);
+      log('稽核需要右表資料', 'WARN');
+      setActionButtonsDisabled(false);
       return;
     }
     if (['audit', 'markFast', 'rulesOnly'].includes(action) && !state.rulesFilePath) {
-      log('尚未設定規則檔，請先上傳規則檔或使用預設路徑。', 'WARN');
-      setBusy(false);
+      log('尚未指定規則檔，請先上傳或選用預設規則檔', 'WARN');
+      setActionButtonsDisabled(false);
       return;
     }
     if (action === 'fullFlow' && (!leftPayload || !rightPayload)) {
-      log('完整流程需要左表（規則偵測）與右表（稽核）。', 'WARN');
-      setBusy(false);
+      log('完整流程需要左表與右表', 'WARN');
+      setActionButtonsDisabled(false);
       return;
     }
 
     let payload;
-    let exec;
     if (action === 'ruleDiscovery') {
       payload = {
         baseline_table: leftPayload?.table || [],
@@ -828,7 +967,6 @@
         consistency_threshold: params.consistency_threshold,
         quick_scan_threshold: params.quick_scan_threshold,
       };
-      exec = () => window.ExcelStudioApi.ruleDiscoveryJson(payload);
     } else if (action === 'audit') {
       payload = {
         detect_rules_file: state.rulesFilePath,
@@ -840,7 +978,6 @@
         tolerance: params.tolerance,
         strict_row_match: params.strict_row_match,
       };
-      exec = () => window.ExcelStudioApi.auditJson(payload);
     } else if (action === 'markFast') {
       payload = {
         detect_rules_file: state.rulesFilePath,
@@ -852,7 +989,6 @@
         tolerance: params.tolerance,
         strict_row_match: params.strict_row_match,
       };
-      exec = () => window.ExcelStudioApi.auditJson(payload);
     } else if (action === 'rulesOnly') {
       payload = {
         detect_rules_file: state.rulesFilePath,
@@ -864,7 +1000,6 @@
         tolerance: params.tolerance,
         strict_row_match: params.strict_row_match,
       };
-      exec = () => window.ExcelStudioApi.auditJson(payload);
     } else if (action === 'fullFlow') {
       payload = {
         baseline_table: leftPayload?.table || [],
@@ -879,52 +1014,13 @@
         consistency_threshold: params.consistency_threshold,
         quick_scan_threshold: params.quick_scan_threshold,
       };
-      exec = () => window.ExcelStudioApi.fullFlowJson(payload);
     } else {
-      throw new Error(`未知的 action: ${action}`);
+      throw new Error(`未知 action: ${action}`);
     }
 
-    setApiResponse(payload);
     const leftName = state.left.file?.name || '-';
     const rightName = state.right.file?.name || '-';
-    log(`執行 ${action} API 呼叫 -> ${endpoint} ${baseUrl ? `(${baseUrl})` : ''} | 左檔=${leftName} 右檔=${rightName}`);
-    try {
-      const result = await exec();
-      setApiResponse(result);
-      if ((action === 'ruleDiscovery' || action === 'fullFlow') && result?.detect_rules_file) {
-        state.rulesFilePath = result.detect_rules_file;
-        updateRulesFileInfo();
-        log(`規則檔已更新：${result.detect_rules_file}`);
-      } else if (action === 'fullFlow' && result?.discovery?.detect_rules_file) {
-        state.rulesFilePath = result.discovery.detect_rules_file;
-        updateRulesFileInfo();
-        log(`規則檔已更新：${result.discovery.detect_rules_file}`);
-      }
-      log(`${action} 完成`);
-      if (action === 'audit' || action === 'fullFlow') {
-        const sheetName = result?.suspect_sheet || result?.mark_summary?.suspect_sheet || null;
-        const cells = result?.suspect_cells || result?.mark_summary?.suspect_cells || [];
-        if (sheetName && Array.isArray(cells)) {
-          state.suspect.sheetName = sheetName;
-          state.suspect.cells = cells;
-          state.suspect.index = -1;
-          applySuspectToPane(state.left, state.left.sheetName);
-          applySuspectToPane(state.right, state.right.sheetName);
-          log(`已標記疑似儲存格：${cells.length}`);
-        } else {
-          state.suspect.sheetName = null;
-          state.suspect.cells = [];
-          state.suspect.index = -1;
-          clearSuspectFromPane(state.left);
-          clearSuspectFromPane(state.right);
-        }
-      }
-        } catch (err) {
-      setApiResponse(err.message || String(err));
-      log(`${action} failed: ${err.message || err}`, 'ERROR');
-    } finally {
-      setBusy(false);
-    }
+    await startTask(action, payload, endpoint, baseUrl, leftName, rightName);
   }
 
   function bindActions() {
@@ -964,6 +1060,7 @@
     $('btnRunFastMark').addEventListener('click', () => runAction('markFast'));
     $('btnRunRulesOnly').addEventListener('click', () => runAction('rulesOnly'));
     $('btnRunFullFlow').addEventListener('click', () => runAction('fullFlow'));
+    els.btnStopTask?.addEventListener('click', stopCurrentTask);
 
     els.rulesJsonModalClose?.addEventListener('click', closeRulesJsonModal);
     els.rulesJsonModalBackdrop?.addEventListener('click', closeRulesJsonModal);
@@ -1001,7 +1098,7 @@
       panel.classList.toggle('is-collapsed');
       updateLabel();
       // const collapsed = panel.classList.contains('is-collapsed');
-      // log(`快速參數${collapsed ? '已收合' : '已展開'}`);
+      // log(`敹恍???{collapsed ? '撌脫?? : '撌脣???}`);
     });
     updateLabel();
   }
@@ -1046,6 +1143,8 @@
   initLogPanelToggle();
   checkHealth();
 })();
+
+
 
 
 

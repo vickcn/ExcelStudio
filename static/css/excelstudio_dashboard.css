@@ -110,6 +110,7 @@ button, input, select, textarea { font: inherit; }
 .btn-secondary { background: rgba(88, 166, 255, 0.14); border-color: rgba(88, 166, 255, 0.25); }
 .btn-accent { background: linear-gradient(135deg, rgba(126,240,194,0.9), rgba(88,166,255,0.8)); color: #03121e; font-weight: 700; }
 .btn-ghost { background: rgba(255,255,255,0.03); border-color: var(--line); }
+.btn-danger { background: rgba(255, 107, 129, 0.16); border-color: rgba(255, 107, 129, 0.5); color: #ffd7dd; }
 
 .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-grid.single { display: grid; grid-template-columns: 1fr; gap: 10px; }

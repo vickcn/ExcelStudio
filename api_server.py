@@ -7,6 +7,9 @@ import shutil
 import os
 import sys
 import traceback
+import threading
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -260,6 +263,57 @@ def _safe_filename(name: str) -> str:
 
 
 # ---------------------------------------------------------
+# Task progress tracking
+# ---------------------------------------------------------
+class _TaskCancelled(Exception):
+    pass
+
+
+TASK_LOCK = threading.Lock()
+TASK_STATE: Dict[str, Any] = {
+    "task_id": None,
+    "status": "idle",
+    "action": None,
+    "progress": 0,
+    "message": "",
+    "result": None,
+    "error": None,
+    "started_at": None,
+    "updated_at": None,
+    "cancel_event": None,
+}
+
+
+def _utc_now() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def _task_public_state() -> Dict[str, Any]:
+    with TASK_LOCK:
+        return {
+            "task_id": TASK_STATE.get("task_id"),
+            "status": TASK_STATE.get("status"),
+            "action": TASK_STATE.get("action"),
+            "progress": TASK_STATE.get("progress", 0),
+            "message": TASK_STATE.get("message"),
+            "result": TASK_STATE.get("result"),
+            "error": TASK_STATE.get("error"),
+            "started_at": TASK_STATE.get("started_at"),
+            "updated_at": TASK_STATE.get("updated_at"),
+        }
+
+
+def _set_task_state(**kwargs: Any) -> None:
+    with TASK_LOCK:
+        TASK_STATE.update(kwargs)
+        TASK_STATE["updated_at"] = _utc_now()
+
+
+def _set_task_progress(progress: int, message: str) -> None:
+    _set_task_state(progress=int(progress), message=message)
+
+
+# ---------------------------------------------------------
 # Request models
 # ---------------------------------------------------------
 class CommonWindowOptions(BaseModel):
@@ -369,6 +423,15 @@ class RulesOnlyRequest(CommonWindowOptions):
     target_excel: str
     detect_rules_file: str
     out_excel: Optional[str] = None
+
+
+class TaskStartRequest(BaseModel):
+    action: str
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TaskStopRequest(BaseModel):
+    task_id: Optional[str] = None
 
 
 # ---------------------------------------------------------
@@ -806,6 +869,145 @@ def _run_full_flow_json(req: FullFlowJsonRequest) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------
+# Task runners
+# ---------------------------------------------------------
+def _ensure_not_cancelled(cancel_event: threading.Event) -> None:
+    if cancel_event.is_set():
+        raise _TaskCancelled()
+
+
+def _run_task_action(action: str, payload: Dict[str, Any], cancel_event: threading.Event) -> Dict[str, Any]:
+    _ensure_not_cancelled(cancel_event)
+    if action == "ruleDiscovery":
+        _set_task_progress(15, "規則偵測中")
+        req = RuleDiscoveryJsonRequest(**payload)
+        result = _run_rule_discovery_json(req)
+        _set_task_progress(90, "規則偵測完成")
+        return result
+
+    if action in {"audit", "markFast", "rulesOnly"}:
+        _set_task_progress(20, "稽核中")
+        req = AuditJsonRequest(**payload)
+        result = _run_audit_json(req)
+        _set_task_progress(90, "稽核完成")
+        return result
+
+    if action == "fullFlow":
+        req = FullFlowJsonRequest(**payload)
+        _set_task_progress(15, "規則偵測中")
+        discovery_req = RuleDiscoveryJsonRequest(
+            baseline_table=req.baseline_table,
+            baseline_sheet_name=req.baseline_sheet_name,
+            start_loc_row_name=req.row_name,
+            window_height=req.window_height,
+            window_width=req.window_width,
+            use_openai=req.use_openai,
+            openai_model=req.openai_model,
+            consistency_threshold=req.consistency_threshold,
+            quick_scan_threshold=req.quick_scan_threshold,
+            quick_scan_seed=req.quick_scan_seed,
+            use_phase1_global_llm_batch=req.use_phase1_global_llm_batch,
+            phase2_overlap_phase1_retro=req.phase2_overlap_phase1_retro,
+            step_rows=req.step_rows,
+            step_cols=req.step_cols,
+            degeneracy_min_nonzero_count=req.degeneracy_min_nonzero_count,
+            degeneracy_min_distinct_nonzero=req.degeneracy_min_distinct_nonzero,
+        )
+        discovery = _run_rule_discovery_json(discovery_req)
+        if not discovery.get("success"):
+            return {
+                "success": False,
+                "mode": "full_flow_json",
+                "error": "rule discovery failed",
+                "discovery": discovery,
+            }
+        _ensure_not_cancelled(cancel_event)
+
+        _set_task_progress(65, "稽核中")
+        detect_rules_file = discovery.get("detect_rules_file") or str(_get_rules_file_path())
+        if not _exists(detect_rules_file):
+            raise _http_error(f"detect_rules_file not found: {detect_rules_file}")
+        audit_req = AuditJsonRequest(
+            detect_rules_file=detect_rules_file,
+            target_table=req.target_table,
+            target_sheet_name=req.target_sheet_name,
+            row_name=req.row_name,
+            window_height=req.window_height,
+            window_width=req.window_width,
+            tolerance=req.tolerance,
+            strict_row_match=req.strict_row_match,
+        )
+        audit = _run_audit_json(audit_req)
+        _set_task_progress(90, "稽核完成")
+        return {
+            "success": True,
+            "mode": "full_flow_json",
+            "detect_rules_file": detect_rules_file,
+            "discovery": discovery,
+            "audit": audit,
+            "suspect_sheet": audit.get("suspect_sheet"),
+            "suspect_cells": audit.get("suspect_cells", []),
+            "outputs": discovery.get("outputs", {}),
+        }
+
+    raise _http_error(f"unsupported task action: {action}")
+
+
+def _task_worker(task_id: str, action: str, payload: Dict[str, Any], cancel_event: threading.Event) -> None:
+    try:
+        _set_task_state(
+            task_id=task_id,
+            status="running",
+            action=action,
+            progress=5,
+            message="準備中",
+            result=None,
+            error=None,
+            started_at=_utc_now(),
+            cancel_event=cancel_event,
+        )
+        result = _run_task_action(action, payload, cancel_event)
+        if cancel_event.is_set():
+            raise _TaskCancelled()
+        _set_task_state(status="done", progress=100, message="完成", result=result)
+    except _TaskCancelled:
+        _set_task_state(status="cancelled", progress=0, message="已中止", result=None)
+    except Exception as exc:
+        _set_task_state(status="error", progress=100, message=str(exc), error=traceback.format_exc())
+
+
+def _start_task(action: str, payload: Dict[str, Any]) -> str:
+    with TASK_LOCK:
+        if TASK_STATE.get("status") in {"running", "cancel_requested"}:
+            raise _http_error("task already running", status_code=409)
+        if action not in {"ruleDiscovery", "audit", "markFast", "rulesOnly", "fullFlow"}:
+            raise _http_error(f"unsupported task action: {action}")
+        task_id = str(uuid.uuid4())
+        cancel_event = threading.Event()
+        TASK_STATE.update(
+            {
+                "task_id": task_id,
+                "status": "running",
+                "action": action,
+                "progress": 0,
+                "message": "排程中",
+                "result": None,
+                "error": None,
+                "started_at": _utc_now(),
+                "updated_at": _utc_now(),
+                "cancel_event": cancel_event,
+            }
+        )
+    thread = threading.Thread(
+        target=_task_worker,
+        args=(task_id, action, payload, cancel_event),
+        daemon=True,
+    )
+    thread.start()
+    return task_id
+
+
+# ---------------------------------------------------------
 # API routes
 # ---------------------------------------------------------
 @app.get("/")
@@ -815,6 +1017,9 @@ def root():
         "version": "1.0.0",
         "endpoints": [
             "GET /health",
+            "POST /api/task/start",
+            "GET /api/task/progress",
+            "POST /api/task/stop",
             "GET /api/rules/discovered",
             "POST /api/excel/upload",
             "POST /api/outputs/clear",
@@ -840,6 +1045,40 @@ def health():
         "excelstudio_py": str(CURRENT_DIR / "ExcelStudio.py"),
         "data_process_dir": str(DATA_PROCESS_DIR),
     }
+
+
+@app.post("/api/task/start")
+async def api_task_start(req: TaskStartRequest):
+    task_id = _start_task(req.action, req.payload or {})
+    return {"success": True, "task_id": task_id}
+
+
+@app.get("/api/task/progress")
+def api_task_progress(task_id: Optional[str] = None):
+    state = _task_public_state()
+    if task_id and state.get("task_id") != task_id:
+        raise _http_error("task_id not found", status_code=404)
+    return {"success": True, **state}
+
+
+@app.post("/api/task/stop")
+async def api_task_stop(req: TaskStopRequest):
+    with TASK_LOCK:
+        if TASK_STATE.get("status") != "running":
+            return {
+                "success": True,
+                "status": TASK_STATE.get("status"),
+                "task_id": TASK_STATE.get("task_id"),
+            }
+        if req.task_id and req.task_id != TASK_STATE.get("task_id"):
+            raise _http_error("task_id not found", status_code=404)
+        cancel_event = TASK_STATE.get("cancel_event")
+        if cancel_event:
+            cancel_event.set()
+        TASK_STATE["status"] = "cancel_requested"
+        TASK_STATE["message"] = "中止中"
+        TASK_STATE["updated_at"] = _utc_now()
+    return {"success": True, "status": "cancel_requested", "task_id": TASK_STATE.get("task_id")}
 
 
 @app.get("/api/rules/discovered")

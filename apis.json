@@ -1,0 +1,283 @@
+{
+  "generated_at": "2026-04-08T12:15:50.220216",
+  "base_url": "http://10.1.3.127:7017",
+  "provider": "openai",
+  "model": "gpt35_chat",
+  "templates_dirs": [],
+  "input_files": [
+    "C:\\ML_HOME\\ExcelStudio\\api_server.py"
+  ],
+  "files": {
+    "C:\\ML_HOME\\ExcelStudio\\api_server.py": {
+      "path": "C:\\ML_HOME\\ExcelStudio\\api_server.py",
+      "endpoints": [
+        {
+          "function": "root",
+          "name": "root",
+          "signature": "async root(request)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/",
+          "full_path": "/",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於處理根路徑的GET請求，返回包含特定模板內容的響應，或者返回ExcelStudio API Server的標題。",
+          "error": null
+        },
+        {
+          "function": "health",
+          "name": "health",
+          "signature": "health()",
+          "methods": [
+            "GET"
+          ],
+          "path": "/health",
+          "full_path": "/health",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於檢查伺服器健康狀態，回傳包含目前工作目錄、輸出目錄等資訊的 JSON 格式資料。",
+          "error": null
+        },
+        {
+          "function": "api_task_start",
+          "name": "api_task_start",
+          "signature": "async api_task_start(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/task/start",
+          "full_path": "/api/task/start",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點是用來啟動一個任務，接收 POST 請求，並返回成功啟動的任務 ID。",
+          "error": null
+        },
+        {
+          "function": "api_task_progress",
+          "name": "api_task_progress",
+          "signature": "api_task_progress(task_id=None)",
+          "methods": [
+            "GET"
+          ],
+          "path": "/api/task/progress",
+          "full_path": "/api/task/progress",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於獲取任務進度，通過GET請求/api/task/progress路徑來獲取任務的進度狀態。",
+          "error": null
+        },
+        {
+          "function": "api_task_stop",
+          "name": "api_task_stop",
+          "signature": "async api_task_stop(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/task/stop",
+          "full_path": "/api/task/stop",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於停止正在運行的任務，如果任務正在運行，則會發出取消請求，並返回相關狀態資訊。",
+          "error": null
+        },
+        {
+          "function": "api_rules_discovered",
+          "name": "api_rules_discovered",
+          "signature": "api_rules_discovered()",
+          "methods": [
+            "GET"
+          ],
+          "path": "/api/rules/discovered",
+          "full_path": "/api/rules/discovered",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於獲取已發現的規則，通過GET請求返回規則文件的路徑和數據。",
+          "error": null
+        },
+        {
+          "function": "api_rules_path",
+          "name": "api_rules_path",
+          "signature": "api_rules_path()",
+          "methods": [
+            "GET"
+          ],
+          "path": "/api/rules/path",
+          "full_path": "/api/rules/path",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此 API 端點用於獲取規則檔案的路徑，以 GET 方法呼叫後回傳路徑資訊。",
+          "error": null
+        },
+        {
+          "function": "api_rules_download",
+          "name": "api_rules_download",
+          "signature": "api_rules_download()",
+          "methods": [
+            "GET"
+          ],
+          "path": "/api/rules/download",
+          "full_path": "/api/rules/download",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於下載規則檔案，以GET方法呼叫，返回JSON格式的規則檔案。",
+          "error": null
+        },
+        {
+          "function": "api_rules_upload",
+          "name": "api_rules_upload",
+          "signature": "async api_rules_upload(file=File(...))",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/rules/upload",
+          "full_path": "/api/rules/upload",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "此API端點用於上傳規則檔案（JSON格式），檢查並存儲該檔案，返回成功與檔案資訊。",
+          "error": null
+        },
+        {
+          "function": "api_excel_upload",
+          "name": "api_excel_upload",
+          "signature": "async api_excel_upload(file=File(...))",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/excel/upload",
+          "full_path": "/api/excel/upload",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個API端點用於上傳Excel檔案至伺服器，檔案格式支援.xlsx、.xls、.xlsm、.csv，成功上傳後會回傳檔案路徑和大小。",
+          "error": null
+        },
+        {
+          "function": "api_outputs_clear",
+          "name": "api_outputs_clear",
+          "signature": "api_outputs_clear()",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/outputs/clear",
+          "full_path": "/api/outputs/clear",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於清空輸出目錄，透過 POST 方法訪問。",
+          "error": null
+        },
+        {
+          "function": "api_rules_discover",
+          "name": "api_rules_discover",
+          "signature": "async api_rules_discover(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/rules/discover",
+          "full_path": "/api/rules/discover",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於發現規則，接收 POST 請求並執行規則發現功能。",
+          "error": null
+        },
+        {
+          "function": "api_rules_discover_json",
+          "name": "api_rules_discover_json",
+          "signature": "async api_rules_discover_json(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/rules/discover-json",
+          "full_path": "/api/rules/discover-json",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於發現規則並以 JSON 格式返回，接收 POST 請求。",
+          "error": null
+        },
+        {
+          "function": "api_audit",
+          "name": "api_audit",
+          "signature": "async api_audit(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/audit",
+          "full_path": "/api/audit",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點是用來執行審計功能，接收 POST 請求並在背景執行審計操作，若失敗則返回錯誤訊息。",
+          "error": null
+        },
+        {
+          "function": "api_audit_json",
+          "name": "api_audit_json",
+          "signature": "async api_audit_json(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/audit-json",
+          "full_path": "/api/audit-json",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點用於進行 JSON 審計，接收 POST 請求並執行 JSON 審計功能。",
+          "error": null
+        },
+        {
+          "function": "api_mark_fast",
+          "name": "api_mark_fast",
+          "signature": "async api_mark_fast(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/mark-fast",
+          "full_path": "/api/mark-fast",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點是用來快速標記的，接受 POST 請求，處理標記請求並返回結果。",
+          "error": null
+        },
+        {
+          "function": "api_rules_only",
+          "name": "api_rules_only",
+          "signature": "async api_rules_only(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/rules-only",
+          "full_path": "/api/rules-only",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點的功能是執行規則驗證，接收 POST 請求並返回相應結果。",
+          "error": null
+        },
+        {
+          "function": "api_full_flow",
+          "name": "api_full_flow",
+          "signature": "async api_full_flow(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/full-flow",
+          "full_path": "/api/full-flow",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點是用來執行完整流程的，接收 POST 請求並在背景執行完整流程的相關操作。",
+          "error": null
+        },
+        {
+          "function": "api_full_flow_json",
+          "name": "api_full_flow_json",
+          "signature": "async api_full_flow_json(req)",
+          "methods": [
+            "POST"
+          ],
+          "path": "/api/full-flow-json",
+          "full_path": "/api/full-flow-json",
+          "router_name": "app",
+          "docstring": "",
+          "summary": "這個 API 端點的功能是接收 POST 請求，並執行完整的流程以 JSON 格式返回結果。",
+          "error": null
+        }
+      ]
+    }
+  }
+}

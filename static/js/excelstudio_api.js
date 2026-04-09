@@ -37,6 +37,9 @@ window.ExcelStudioApi = (() => {
       return request('/api/rules/upload', { method: 'POST', body: form });
     },
     clearOutputs: () => request('/api/outputs/clear', { method: 'POST', headers: jsonHeaders }),
+    taskStart: (action, payload) => callJson('/api/task/start', { action, payload }),
+    taskProgress: (taskId) => request(`/api/task/progress${taskId ? `?task_id=${encodeURIComponent(taskId)}` : ''}`),
+    taskStop: (taskId) => callJson('/api/task/stop', { task_id: taskId ?? null }),
     ruleDiscovery: (payload) => callJson('/api/rules/discover', payload),
     ruleDiscoveryJson: (payload) => callJson('/api/rules/discover-json', payload),
     audit: (payload) => callJson('/api/audit', payload),
