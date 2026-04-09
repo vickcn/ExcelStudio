@@ -19,4 +19,4 @@ tmp*
 *timer*.json
 *discovered_rules*.json
 *output*/
-issues/
+issues*/*
