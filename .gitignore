@@ -3,9 +3,9 @@
 *.xlsx
 *.csv
 *bak
-*bak\
+*bak/
 *.bak
-*tmp\
+*tmp/
 *outputs*
 *demo*
 *.md
@@ -14,9 +14,14 @@
 *.env*
 tmp*
 *pyc*
+*.zip
 
 *analysis_result*.json
 *timer*.json
 *discovered_rules*.json
+prompts/*rule*.json
+prompts/*observe*.json
 *output*/
 issues*/*
+storage*/*
+
