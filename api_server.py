@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import csv
+import io
 import shutil
 import os
 import sys
@@ -39,6 +41,7 @@ if str(DATA_PROCESS_DIR) not in sys.path:
 import ExcelStudio
 from dataProcess import run_math_rule_analysis
 from dataProcess import rule_audit_mark_excel
+from xlsx_stdio import XlsxStdioServer
 
 
 # ---------------------------------------------------------
@@ -231,7 +234,7 @@ def _read_json_file(path: Path) -> Any:
     if not path.exists():
         raise _http_error(f"file not found: {path}")
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             return json.load(f)
     except Exception as exc:
         raise _http_error(f"failed to read json: {path}", status_code=500) from exc
@@ -260,6 +263,267 @@ def _http_error(message: str, status_code: int = 400) -> HTTPException:
 def _safe_filename(name: str) -> str:
     # minimal sanitization; keep Unicode, just strip path parts
     return Path(name).name
+
+
+RULE_BLOB_STORE: Dict[str, Dict[str, Any]] = {}
+RULE_BLOB_LOCK = threading.Lock()
+RULE_BLOB_MAX_SIZE = 128
+
+_xlsx_stdio_server: Optional[XlsxStdioServer] = None
+_XLSX_STDIO_INIT_LOCK = threading.Lock()
+_XLSX_STDIO_PROCESS_LOCK = threading.Lock()
+
+
+def _get_xlsx_stdio_server() -> XlsxStdioServer:
+    global _xlsx_stdio_server
+    if _xlsx_stdio_server is not None:
+        return _xlsx_stdio_server
+    with _XLSX_STDIO_INIT_LOCK:
+        if _xlsx_stdio_server is None:
+            _xlsx_stdio_server = XlsxStdioServer()
+        return _xlsx_stdio_server
+
+
+def _store_rules_blob(rules: Any) -> str:
+    rules_id = uuid.uuid4().hex
+    with RULE_BLOB_LOCK:
+        RULE_BLOB_STORE[rules_id] = {
+            "created_at": _utc_now(),
+            "rules": rules,
+        }
+        while len(RULE_BLOB_STORE) > RULE_BLOB_MAX_SIZE:
+            oldest_key = next(iter(RULE_BLOB_STORE))
+            RULE_BLOB_STORE.pop(oldest_key, None)
+    return rules_id
+
+
+def _get_rules_blob(rules_id: str) -> Optional[Any]:
+    with RULE_BLOB_LOCK:
+        item = RULE_BLOB_STORE.get(rules_id)
+        return item.get("rules") if isinstance(item, dict) else None
+
+
+def _coerce_cell_value(raw: Any) -> Any:
+    if not isinstance(raw, str):
+        return raw
+    text = raw.strip()
+    if text == "":
+        return ""
+
+    lowered = text.lower()
+    if lowered in {"null", "none"}:
+        return None
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+
+    try:
+        return int(text)
+    except Exception:
+        pass
+    try:
+        return float(text)
+    except Exception:
+        pass
+    return text
+
+
+def _normalize_2d_table(value: Any, *, field_name: str) -> List[List[Any]]:
+    source = value
+    if isinstance(source, dict):
+        if "table" in source:
+            source = source.get("table")
+        elif "data" in source:
+            source = source.get("data")
+
+    if not isinstance(source, list):
+        raise _http_error(f"{field_name} must be a 2D array")
+
+    table: List[List[Any]] = []
+    for idx, row in enumerate(source):
+        if not isinstance(row, (list, tuple)):
+            raise _http_error(f"{field_name}[{idx}] must be an array")
+        table.append([_coerce_cell_value(cell) for cell in row])
+    if not table:
+        raise _http_error(f"{field_name} cannot be empty")
+    return table
+
+
+def _parse_markdown_table(table_text: str) -> List[List[Any]]:
+    lines = [line.strip() for line in table_text.splitlines() if line.strip()]
+    parsed: List[List[Any]] = []
+    for line in lines:
+        if "|" not in line:
+            continue
+        stripped = line.strip().strip("|").strip()
+        if not stripped:
+            continue
+        compact = stripped.replace(" ", "")
+        if compact and all(ch in "-:|" for ch in compact):
+            continue
+        cells = [part.strip() for part in line.strip().strip("|").split("|")]
+        parsed.append([_coerce_cell_value(cell) for cell in cells])
+    return parsed
+
+
+def _parse_delimited_table(table_text: str, delimiter: str) -> List[List[Any]]:
+    rows: List[List[Any]] = []
+    reader = csv.reader(io.StringIO(table_text), delimiter=delimiter)
+    for row in reader:
+        if not row:
+            continue
+        rows.append([_coerce_cell_value(cell) for cell in row])
+    return rows
+
+
+def _parse_table_text(table_text: str, table_format: str = "auto") -> List[List[Any]]:
+    fmt = (table_format or "auto").strip().lower()
+    if fmt not in {"auto", "csv", "tsv", "json", "markdown"}:
+        raise _http_error("table_format must be one of auto/csv/tsv/json/markdown")
+    if not isinstance(table_text, str) or not table_text.strip():
+        raise _http_error("table text is required")
+
+    stripped = table_text.strip()
+    if fmt in {"auto", "json"}:
+        if fmt == "json" or stripped[:1] in {"[", "{"}:
+            try:
+                return _normalize_2d_table(json.loads(stripped), field_name="table")
+            except HTTPException:
+                raise
+            except Exception:
+                if fmt == "json":
+                    raise _http_error("invalid JSON table text")
+
+    if fmt in {"auto", "markdown"}:
+        md_rows = _parse_markdown_table(table_text)
+        if md_rows:
+            return md_rows
+        if fmt == "markdown":
+            raise _http_error("invalid markdown table text")
+
+    if fmt == "tsv":
+        tsv_rows = _parse_delimited_table(table_text, "\t")
+        if not tsv_rows:
+            raise _http_error("invalid TSV table text")
+        return tsv_rows
+
+    if fmt == "csv":
+        csv_rows = _parse_delimited_table(table_text, ",")
+        if not csv_rows:
+            raise _http_error("invalid CSV table text")
+        return csv_rows
+
+    # auto fallback: tsv first, then csv
+    if "\t" in table_text:
+        auto_tsv = _parse_delimited_table(table_text, "\t")
+        if auto_tsv:
+            return auto_tsv
+    auto_csv = _parse_delimited_table(table_text, ",")
+    if auto_csv:
+        return auto_csv
+    raise _http_error("unable to parse table text")
+
+
+def _resolve_rules_payload(
+    *,
+    rules_id: Optional[str],
+    rules_json: Optional[str],
+    rules: Any,
+    detect_rules_file: Optional[str],
+) -> Dict[str, Any]:
+    if rules is not None:
+        payload = rules
+        source = "rules"
+    elif rules_json:
+        try:
+            payload = json.loads(rules_json)
+        except Exception:
+            raise _http_error("invalid rules_json")
+        source = "rules_json"
+    elif rules_id:
+        payload = _get_rules_blob(rules_id)
+        if payload is None:
+            raise _http_error(f"rules_id not found: {rules_id}", status_code=404)
+        source = "rules_id"
+    elif detect_rules_file:
+        abs_path = _abs_path(detect_rules_file)
+        if not _exists(abs_path):
+            raise _http_error(f"detect_rules_file not found: {abs_path}")
+        payload = _read_json_file(Path(abs_path))
+        source = "detect_rules_file"
+    else:
+        raise _http_error(
+            "one of rules_id/rules_json/rules/detect_rules_file is required",
+        )
+
+    if not isinstance(payload, (dict, list)):
+        raise _http_error("rules payload must be a JSON object or array")
+    return {"rules": payload, "source": source}
+
+
+def _run_audit_json_with_rules(
+    *,
+    target_table: List[List[Any]],
+    target_sheet_name: Optional[str],
+    row_name: Optional[str],
+    window_height: int,
+    window_width: int,
+    tolerance: float,
+    strict_row_match: bool,
+    rules_payload: Any,
+    rules_source: str,
+) -> Dict[str, Any]:
+    tmp_dir = _safe_outputs_dir() / "agent_rules_cache"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_path = tmp_dir / f"rules_{uuid.uuid4().hex}.json"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(rules_payload, f, ensure_ascii=False, indent=2)
+
+    try:
+        audit_req = AuditJsonRequest(
+            detect_rules_file=str(tmp_path),
+            target_table=target_table,
+            target_sheet_name=target_sheet_name,
+            row_name=row_name,
+            window_height=window_height,
+            window_width=window_width,
+            tolerance=tolerance,
+            strict_row_match=strict_row_match,
+        )
+        result = _run_audit_json(audit_req)
+    finally:
+        try:
+            tmp_path.unlink()
+        except Exception:
+            pass
+
+    result["rules_source"] = rules_source
+    result["detect_rules_file"] = None
+    return result
+
+
+def _build_suspect_summary_text(result: Dict[str, Any]) -> str:
+    suspect_sheet = result.get("suspect_sheet")
+    suspect_cells = result.get("suspect_cells") or []
+    addresses = [str(item.get("address")) for item in suspect_cells if isinstance(item, dict) and item.get("address")]
+    preview = ", ".join(addresses[:20]) if addresses else "none"
+    return (
+        f"suspect_sheet={suspect_sheet or 'unknown'}; "
+        f"suspect_cells_count={len(suspect_cells)}; "
+        f"suspect_cells_preview={preview}"
+    )
+
+
+def _estimate_rules_count(payload: Any) -> int:
+    if isinstance(payload, list):
+        return len(payload)
+    if isinstance(payload, dict):
+        for key in ("rules", "passed_rules", "discovered_rules", "baseline_rules"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return len(value)
+    return 0
 
 
 # ---------------------------------------------------------
@@ -419,6 +683,77 @@ class FullFlowJsonRequest(CommonWindowOptions):
     degeneracy_min_distinct_nonzero: Optional[int] = None
 
 
+class RuleDiscoveryAgentRequest(BaseModel):
+    baseline_text: str = Field(..., description="Table text in csv/tsv/json/markdown")
+    table_format: str = Field(default="auto", description="auto/csv/tsv/json/markdown")
+    baseline_sheet_name: Optional[str] = None
+    start_loc_row_name: Optional[str] = None
+    window_height: int = 3
+    window_width: int = 1
+
+    use_openai: bool = False
+    openai_model: str = "gpt35_chat"
+    consistency_threshold: float = 0.8
+    quick_scan_threshold: int = 3
+
+    quick_scan_seed: Optional[int] = None
+    use_phase1_global_llm_batch: Optional[bool] = None
+    phase2_overlap_phase1_retro: Optional[bool] = None
+    step_rows: Optional[int] = None
+    step_cols: Optional[int] = None
+    degeneracy_min_nonzero_count: Optional[int] = None
+    degeneracy_min_distinct_nonzero: Optional[int] = None
+
+    store_rules: bool = True
+    return_rules_json: bool = True
+
+
+class AuditAgentRequest(CommonWindowOptions):
+    target_text: str = Field(..., description="Table text in csv/tsv/json/markdown")
+    table_format: str = Field(default="auto", description="auto/csv/tsv/json/markdown")
+    target_sheet_name: Optional[str] = None
+
+    rules_id: Optional[str] = None
+    rules_json: Optional[str] = None
+    rules: Optional[Any] = None
+    detect_rules_file: Optional[str] = None
+
+    store_rules: bool = False
+    return_rules_json: bool = False
+
+
+class FullFlowAgentRequest(CommonWindowOptions):
+    baseline_text: str = Field(..., description="Table text in csv/tsv/json/markdown")
+    target_text: str = Field(..., description="Table text in csv/tsv/json/markdown")
+    baseline_table_format: str = Field(default="auto", description="auto/csv/tsv/json/markdown")
+    target_table_format: str = Field(default="auto", description="auto/csv/tsv/json/markdown")
+    baseline_sheet_name: Optional[str] = None
+    target_sheet_name: Optional[str] = None
+    start_loc_row_name: Optional[str] = None
+
+    use_openai: bool = False
+    openai_model: str = "gpt35_chat"
+    consistency_threshold: float = 0.8
+    quick_scan_threshold: int = 3
+
+    quick_scan_seed: Optional[int] = None
+    use_phase1_global_llm_batch: Optional[bool] = None
+    phase2_overlap_phase1_retro: Optional[bool] = None
+    step_rows: Optional[int] = None
+    step_cols: Optional[int] = None
+    degeneracy_min_nonzero_count: Optional[int] = None
+    degeneracy_min_distinct_nonzero: Optional[int] = None
+
+    rules_id: Optional[str] = None
+    rules_json: Optional[str] = None
+    rules: Optional[Any] = None
+    detect_rules_file: Optional[str] = None
+    force_discovery: bool = False
+
+    store_rules: bool = True
+    return_rules_json: bool = True
+
+
 class RulesOnlyRequest(CommonWindowOptions):
     target_excel: str
     detect_rules_file: str
@@ -432,6 +767,56 @@ class TaskStartRequest(BaseModel):
 
 class TaskStopRequest(BaseModel):
     task_id: Optional[str] = None
+
+
+class XlsxStdioCommandRequest(BaseModel):
+    command: str
+    args: Dict[str, Any] = Field(default_factory=dict)
+    request_id: Optional[str] = None
+
+
+class PreviewGroupAggregateRequest(BaseModel):
+    workbook_id: str
+    sheet: Optional[str] = None
+    range: Optional[str] = None
+    start_cell: Optional[str] = None
+    end_cell: Optional[str] = None
+    group_cols: List[str]
+    value_col: str = "PGA"
+    time_priority: Optional[List[str]] = None
+    include_empty_rows: bool = False
+    preview_limit: int = 10
+    request_id: Optional[str] = None
+
+
+class GroupAggregateRequest(BaseModel):
+    workbook_id: str
+    sheet: Optional[str] = None
+    range: Optional[str] = None
+    start_cell: Optional[str] = None
+    end_cell: Optional[str] = None
+    group_cols: List[str]
+    value_col: str = "PGA"
+    time_priority: Optional[List[str]] = None
+    include_empty_rows: bool = False
+    preview_limit: int = 10
+    write_sheet: Optional[str] = None
+    target_sheet: Optional[str] = None
+    replace_sheet: bool = False
+    clear_sheet: bool = True
+    start_cell_out: Optional[str] = None
+    return_records: bool = False
+    request_id: Optional[str] = None
+
+def _run_xlsx_stdio_command(req: XlsxStdioCommandRequest) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "command": req.command,
+        "args": dict(req.args) if req.args else {},
+        "request_id": req.request_id,
+    }
+    server = _get_xlsx_stdio_server()
+    with _XLSX_STDIO_PROCESS_LOCK:
+        return server.process_payload(payload)
 
 
 # ---------------------------------------------------------
@@ -868,6 +1253,188 @@ def _run_full_flow_json(req: FullFlowJsonRequest) -> Dict[str, Any]:
     }
 
 
+def _run_rule_discovery_agent(req: RuleDiscoveryAgentRequest) -> Dict[str, Any]:
+    baseline_table = _parse_table_text(req.baseline_text, req.table_format)
+    discovery_req = RuleDiscoveryJsonRequest(
+        baseline_table=baseline_table,
+        baseline_sheet_name=req.baseline_sheet_name,
+        start_loc_row_name=req.start_loc_row_name,
+        window_height=req.window_height,
+        window_width=req.window_width,
+        use_openai=req.use_openai,
+        openai_model=req.openai_model,
+        consistency_threshold=req.consistency_threshold,
+        quick_scan_threshold=req.quick_scan_threshold,
+        quick_scan_seed=req.quick_scan_seed,
+        use_phase1_global_llm_batch=req.use_phase1_global_llm_batch,
+        phase2_overlap_phase1_retro=req.phase2_overlap_phase1_retro,
+        step_rows=req.step_rows,
+        step_cols=req.step_cols,
+        degeneracy_min_nonzero_count=req.degeneracy_min_nonzero_count,
+        degeneracy_min_distinct_nonzero=req.degeneracy_min_distinct_nonzero,
+    )
+    discovery = _run_rule_discovery_json(discovery_req)
+
+    rules_payload = None
+    detect_rules_file = discovery.get("detect_rules_file")
+    if detect_rules_file and _exists(detect_rules_file):
+        rules_payload = _read_json_file(Path(str(detect_rules_file)))
+
+    rules_id = _store_rules_blob(rules_payload) if (rules_payload is not None and req.store_rules) else None
+    rules_json = json.dumps(rules_payload, ensure_ascii=False) if (rules_payload is not None and req.return_rules_json) else None
+
+    rows = len(baseline_table)
+    cols = len(baseline_table[0]) if baseline_table else 0
+    summary_text = (
+        f"baseline_rows={rows}; baseline_cols={cols}; success={bool(discovery.get('success'))}; "
+        f"rules_count={_estimate_rules_count(rules_payload)}"
+    )
+
+    return {
+        "success": bool(discovery.get("success")),
+        "mode": "rule_discovery_agent",
+        "table_rows": rows,
+        "table_cols": cols,
+        "detect_rules_file": detect_rules_file,
+        "rules_id": rules_id,
+        "rules_count": _estimate_rules_count(rules_payload),
+        "rules_json": rules_json,
+        "summary_text": summary_text,
+        "discovery": discovery,
+    }
+
+
+def _run_audit_agent(req: AuditAgentRequest) -> Dict[str, Any]:
+    target_table = _parse_table_text(req.target_text, req.table_format)
+    rules_pack = _resolve_rules_payload(
+        rules_id=req.rules_id,
+        rules_json=req.rules_json,
+        rules=req.rules,
+        detect_rules_file=req.detect_rules_file,
+    )
+    rules_payload = rules_pack["rules"]
+    rules_source = str(rules_pack["source"])
+
+    audit = _run_audit_json_with_rules(
+        target_table=target_table,
+        target_sheet_name=req.target_sheet_name,
+        row_name=req.row_name,
+        window_height=req.window_height,
+        window_width=req.window_width,
+        tolerance=req.tolerance,
+        strict_row_match=req.strict_row_match,
+        rules_payload=rules_payload,
+        rules_source=rules_source,
+    )
+
+    rules_id = req.rules_id if rules_source == "rules_id" else None
+    if rules_id is None and req.store_rules:
+        rules_id = _store_rules_blob(rules_payload)
+    rules_json = json.dumps(rules_payload, ensure_ascii=False) if req.return_rules_json else None
+
+    return {
+        "success": bool(audit.get("success")),
+        "mode": "audit_agent",
+        "table_rows": len(target_table),
+        "table_cols": len(target_table[0]) if target_table else 0,
+        "rules_source": rules_source,
+        "rules_id": rules_id,
+        "rules_count": _estimate_rules_count(rules_payload),
+        "rules_json": rules_json,
+        "summary_text": _build_suspect_summary_text(audit),
+        "audit": audit,
+        "suspect_sheet": audit.get("suspect_sheet"),
+        "suspect_cells": audit.get("suspect_cells", []),
+    }
+
+
+def _run_full_flow_agent(req: FullFlowAgentRequest) -> Dict[str, Any]:
+    baseline_table = _parse_table_text(req.baseline_text, req.baseline_table_format)
+    target_table = _parse_table_text(req.target_text, req.target_table_format)
+    has_input_rules = bool(req.rules_id or req.rules_json or req.rules is not None or req.detect_rules_file)
+
+    discovery: Optional[Dict[str, Any]] = None
+    rules_payload: Any = None
+    rules_source = "discovery"
+    detect_rules_file: Optional[str] = None
+
+    if has_input_rules and not req.force_discovery:
+        rules_pack = _resolve_rules_payload(
+            rules_id=req.rules_id,
+            rules_json=req.rules_json,
+            rules=req.rules,
+            detect_rules_file=req.detect_rules_file,
+        )
+        rules_payload = rules_pack["rules"]
+        rules_source = str(rules_pack["source"])
+    else:
+        discovery_req = RuleDiscoveryJsonRequest(
+            baseline_table=baseline_table,
+            baseline_sheet_name=req.baseline_sheet_name,
+            start_loc_row_name=req.start_loc_row_name,
+            window_height=req.window_height,
+            window_width=req.window_width,
+            use_openai=req.use_openai,
+            openai_model=req.openai_model,
+            consistency_threshold=req.consistency_threshold,
+            quick_scan_threshold=req.quick_scan_threshold,
+            quick_scan_seed=req.quick_scan_seed,
+            use_phase1_global_llm_batch=req.use_phase1_global_llm_batch,
+            phase2_overlap_phase1_retro=req.phase2_overlap_phase1_retro,
+            step_rows=req.step_rows,
+            step_cols=req.step_cols,
+            degeneracy_min_nonzero_count=req.degeneracy_min_nonzero_count,
+            degeneracy_min_distinct_nonzero=req.degeneracy_min_distinct_nonzero,
+        )
+        discovery = _run_rule_discovery_json(discovery_req)
+        if not discovery.get("success"):
+            return {
+                "success": False,
+                "mode": "full_flow_agent",
+                "error": "rule discovery failed",
+                "discovery": discovery,
+            }
+        detect_rules_file = discovery.get("detect_rules_file")
+        if not detect_rules_file or not _exists(detect_rules_file):
+            raise _http_error(f"detect_rules_file not found: {detect_rules_file}")
+        rules_payload = _read_json_file(Path(str(detect_rules_file)))
+
+    audit = _run_audit_json_with_rules(
+        target_table=target_table,
+        target_sheet_name=req.target_sheet_name,
+        row_name=req.row_name,
+        window_height=req.window_height,
+        window_width=req.window_width,
+        tolerance=req.tolerance,
+        strict_row_match=req.strict_row_match,
+        rules_payload=rules_payload,
+        rules_source=rules_source,
+    )
+
+    rules_id = req.rules_id if rules_source == "rules_id" else None
+    if rules_id is None and req.store_rules:
+        rules_id = _store_rules_blob(rules_payload)
+    rules_json = json.dumps(rules_payload, ensure_ascii=False) if req.return_rules_json else None
+
+    return {
+        "success": True,
+        "mode": "full_flow_agent",
+        "flow_branch": "rules_input" if (has_input_rules and not req.force_discovery) else "discover_then_audit",
+        "rules_source": rules_source,
+        "detect_rules_file": detect_rules_file,
+        "rules_id": rules_id,
+        "rules_count": _estimate_rules_count(rules_payload),
+        "rules_json": rules_json,
+        "summary_text": _build_suspect_summary_text(audit),
+        "baseline_table_rows": len(baseline_table),
+        "target_table_rows": len(target_table),
+        "discovery": discovery,
+        "audit": audit,
+        "suspect_sheet": audit.get("suspect_sheet"),
+        "suspect_cells": audit.get("suspect_cells", []),
+    }
+
+
 # ---------------------------------------------------------
 # Task runners
 # ---------------------------------------------------------
@@ -1027,10 +1594,16 @@ def root():
             "POST /api/rules/discover-json",
             "POST /api/audit",
             "POST /api/audit-json",
+            "POST /api/rules/discover-agent",
+            "POST /api/audit-agent",
+            "POST /api/full-flow-agent",
             "POST /api/mark-fast",
             "POST /api/rules-only",
             "POST /api/full-flow",
             "POST /api/full-flow-json",
+            "POST /api/xlsx/command",
+            "POST /api/xlsx/preview-group-aggregate",
+            "POST /api/xlsx/group-aggregate",
         ],
     }
 
@@ -1288,6 +1861,125 @@ async def api_full_flow_json(req: FullFlowJsonRequest):
         )
 
 
+@app.post("/api/rules/discover-agent")
+async def api_rules_discover_agent(req: RuleDiscoveryAgentRequest):
+    try:
+        return await run_in_threadpool(_run_rule_discovery_agent, req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "rule discovery (agent) failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/audit-agent")
+async def api_audit_agent(req: AuditAgentRequest):
+    try:
+        return await run_in_threadpool(_run_audit_agent, req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "audit (agent) failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/full-flow-agent")
+async def api_full_flow_agent(req: FullFlowAgentRequest):
+    try:
+        return await run_in_threadpool(_run_full_flow_agent, req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "full flow (agent) failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/xlsx/command")
+async def api_xlsx_command(req: XlsxStdioCommandRequest):
+    try:
+        return await run_in_threadpool(_run_xlsx_stdio_command, req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "xlsx stdio command failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/xlsx/preview-group-aggregate")
+async def api_xlsx_preview_group_aggregate(req: PreviewGroupAggregateRequest):
+    try:
+        args = req.model_dump(exclude_none=True)
+        request_id = args.pop("request_id", None)
+        payload = XlsxStdioCommandRequest(
+            command="preview_group_aggregate",
+            args=args,
+            request_id=request_id,
+        )
+        return await run_in_threadpool(_run_xlsx_stdio_command, payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "preview_group_aggregate failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/xlsx/group-aggregate")
+async def api_xlsx_group_aggregate(req: GroupAggregateRequest):
+    try:
+        args = req.model_dump(exclude_none=True)
+        request_id = args.pop("request_id", None)
+
+        # 對齊 xlsx_stdio.py 既有參數名
+        if "start_cell_out" in args:
+            args["start_cell"] = args.pop("start_cell_out")
+
+        payload = XlsxStdioCommandRequest(
+            command="group_aggregate",
+            args=args,
+            request_id=request_id,
+        )
+        return await run_in_threadpool(_run_xlsx_stdio_command, payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "group_aggregate failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
 # ---------------------------------------------------------
 # Local run
 # ---------------------------------------------------------

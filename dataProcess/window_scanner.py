@@ -42,29 +42,43 @@ class WindowScanner:
         print(f"開始掃描DataFrame，形狀: {df.shape}")
         print(f"窗格大小: {self.window_shape}, 步長: {step_size}")
 
-        # 如果視窗大小超過 DataFrame，給警告並自動縮小
+        # Resolve scan window size for this dataframe.
+        # Special rule: window_width == -1 means "use full effective table width".
         df_rows, df_cols = df.shape
-        new_height = min(self.window_height, df_rows) if df_rows > 0 else self.window_height
-        new_width = min(self.window_width, df_cols) if df_cols > 0 else self.window_width
-        if new_height != self.window_height or new_width != self.window_width:
+        requested_height = self.window_height
+        requested_width = self.window_width
+        effective_requested_width = df_cols if requested_width == -1 else requested_width
+
+        if requested_width == -1:
+            print(f"window_width=-1，已自動套用有效表格最大欄數: {effective_requested_width}")
+
+        scan_height = min(requested_height, df_rows) if df_rows > 0 else requested_height
+        scan_width = min(effective_requested_width, df_cols) if df_cols > 0 else effective_requested_width
+
+        if (
+            scan_height != requested_height
+            or scan_width != effective_requested_width
+            or requested_width == -1
+        ):
             print(
-                f"警告: 視窗大小 {self.window_shape} 超過 DataFrame 尺寸 {df.shape}，"
-                f"已自動縮小為 ({new_height}, {new_width})"
+                f"調整後掃描視窗: ({scan_height}, {scan_width})，"
+                f"原始設定: ({requested_height}, {requested_width})，DataFrame: {df.shape}"
             )
-            self.window_height = new_height
-            self.window_width = new_width
-            self.window_shape = (new_height, new_width)
+
+        if scan_height <= 0 or scan_width <= 0:
+            print(f"視窗大小無效: ({scan_height}, {scan_width})，略過掃描")
+            return []
         
         # 計算可能的窗格位置
-        max_row = df.shape[0] - self.window_height + 1
-        max_col = df.shape[1] - self.window_width + 1
+        max_row = df.shape[0] - scan_height + 1
+        max_col = df.shape[1] - scan_width + 1
         
         window_count = 0
         
         for start_row in range(0, max_row, row_step):
             for start_col in range(0, max_col, col_step):
-                end_row = start_row + self.window_height
-                end_col = start_col + self.window_width
+                end_row = start_row + scan_height
+                end_col = start_col + scan_width
                 
                 # 提取窗格
                 window_df = df.iloc[start_row:end_row, start_col:end_col].copy()
@@ -95,8 +109,8 @@ class WindowScanner:
                         'start_loc_row_indicated': start_loc_row_indicated
                     }
                 
-                windows.append(window_info)
-                window_count += 1
+                    windows.append(window_info)
+                    window_count += 1
         
         print(f"掃描完成，共產生 {len(windows)} 個有效窗格")
         return windows
@@ -241,7 +255,7 @@ def main():
     parser.add_argument('--window-height', type=int, default=5, 
                        help='窗格高度（預設: 5）')
     parser.add_argument('--window-width', type=int, default=1, 
-                       help='窗格寬度（預設: 1）')
+                       help='窗格寬度（預設: 1；設為 -1 時自動使用有效表格最大欄數）')
     parser.add_argument('--step-row', type=int, default=1, 
                        help='行步長（預設: 1）')
     parser.add_argument('--step-col', type=int, default=1, 

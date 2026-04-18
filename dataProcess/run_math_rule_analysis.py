@@ -6,9 +6,11 @@
 
 import os
 import json
+import copy
+import re
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Literal
 from pathlib import Path
 import argparse
 from datetime import datetime as dt
@@ -58,6 +60,7 @@ class MathRuleAnalyzer:
             use_phase1_global_llm_batch: bool = True,
             phase2_overlap_phase1_retro: bool = True,
             step_size: Tuple[int, int] = (1, 1),
+            retrospective_axes: Literal["row", "col", "both"] = "row",
         ):
         """
         Args:
@@ -72,6 +75,11 @@ class MathRuleAnalyzer:
             use_phase1_global_llm_batch: True 時走 Phase1 全域湊滿 batch 排程（預設）
             phase2_overlap_phase1_retro: A 線時是否讓 Phase2（I/O）與 Phase1 回溯+checkpoint（CPU/寫檔）並行
         """
+        if retrospective_axes not in {"row", "col", "both"}:
+            raise ValueError(
+                f"retrospective_axes 必須是 'row' | 'col' | 'both'，目前收到: {retrospective_axes}"
+            )
+
         self.use_openai = use_openai
         self.window_shape = window_shape
         self.openai_model = openai_model
@@ -83,6 +91,7 @@ class MathRuleAnalyzer:
         self.use_phase1_global_llm_batch = use_phase1_global_llm_batch
         self.phase2_overlap_phase1_retro = phase2_overlap_phase1_retro
         self.step_size = step_size
+        self.retrospective_axes = retrospective_axes
         
         # Initialize core components
         self.window_scanner = WindowScanner(window_shape)
@@ -95,6 +104,7 @@ class MathRuleAnalyzer:
         
         m_print("MathRuleAnalyzer initialized")
         m_print(f"step_size: {self.step_size}")
+        m_print(f"retrospective_axes: {self.retrospective_axes}")
         m_print(f"LLM模式: {'TextProcessor OpenAI' if use_openai else 'TextProcessor remote8b'}")
         m_print(f"視窗大小: {window_shape}")
     
@@ -172,6 +182,7 @@ class MathRuleAnalyzer:
         deferred_windows_total = 0
         deferred_windows_skipped_duplicate = 0
         start_loc_row_validation_phase1: Optional[Dict[str, Any]] = None
+        start_loc_col_validation_phase1: Optional[Dict[str, Any]] = None
         pipeline_timing: Optional[Dict[str, Any]] = None
 
         if self.quick_scan_threshold <= 0:
@@ -260,8 +271,15 @@ class MathRuleAnalyzer:
             m_print(
                 "=== A線 Phase1 回溯驗證（候選規律 vs 該 start_loc 全 prepared 視窗）==="
             )
-            start_loc_row_validation_phase1 = self._retrospective_validate_start_loc_rows(
-                retro_phase1_list
+            phase1_axis_validation = self._run_retrospective_validate_for_axes(
+                retro_phase1_list,
+                retrospective_axes=self.retrospective_axes,
+            )
+            start_loc_row_validation_phase1 = (
+                phase1_axis_validation.get('start_loc_row_validation') or {}
+            )
+            start_loc_col_validation_phase1 = (
+                phase1_axis_validation.get('start_loc_col_validation') or {}
             )
             self.timer['phase1_end'] = dt.now()
 
@@ -296,9 +314,13 @@ class MathRuleAnalyzer:
                     'deferred_windows_total': len(deferred_queue),
                     'deferred_windows_skipped_duplicate': deferred_windows_skipped_duplicate,
                     'phase1_global_llm_batch': self.use_phase1_global_llm_batch,
+                    'retrospective_axes': self.retrospective_axes,
                 },
+                'retrospective_axes': self.retrospective_axes,
                 'start_loc_row_validation': start_loc_row_validation_phase1,
+                'start_loc_col_validation': start_loc_col_validation_phase1,
                 'start_loc_row_validation_phase1': start_loc_row_validation_phase1,
+                'start_loc_col_validation_phase1': start_loc_col_validation_phase1,
                 'textprocessor_cost_summary': phase1_textprocessor_cost_summary,
                 'detailed_results': window_results
             }
@@ -384,7 +406,12 @@ class MathRuleAnalyzer:
                 retro_phase2_list.append(
                     self._stub_window_result_for_phase1_retro(window, prompt_data)
                 )
-        start_loc_row_validation = self._retrospective_validate_start_loc_rows(retro_phase2_list)
+        final_axis_validation = self._run_retrospective_validate_for_axes(
+            retro_phase2_list,
+            retrospective_axes=self.retrospective_axes,
+        )
+        start_loc_row_validation = final_axis_validation.get('start_loc_row_validation') or {}
+        start_loc_col_validation = final_axis_validation.get('start_loc_col_validation') or {}
         self.timer['retrospective_validation'] = dt.now()
         source_label = str(excel_path) if excel_path is not None else "<in_memory>"
         analysis_result = {
@@ -415,10 +442,14 @@ class MathRuleAnalyzer:
                 'deferred_windows_total': deferred_windows_total,
                 'deferred_windows_skipped_duplicate': deferred_windows_skipped_duplicate,
                 'phase1_global_llm_batch': self.use_phase1_global_llm_batch,
+                'retrospective_axes': self.retrospective_axes,
                 **({'pipeline_timing': pipeline_timing} if pipeline_timing else {}),
             },
+            'retrospective_axes': self.retrospective_axes,
             'start_loc_row_validation': start_loc_row_validation,
+            'start_loc_col_validation': start_loc_col_validation,
             'start_loc_row_validation_phase1': start_loc_row_validation_phase1,
+            'start_loc_col_validation_phase1': start_loc_col_validation_phase1,
             'textprocessor_cost_summary': textprocessor_cost_summary,
             'detailed_results': window_results
         }
@@ -1017,6 +1048,282 @@ class MathRuleAnalyzer:
         m_print(f"  Start Loc Row 成功率: {overall_validation['start_loc_row_success_rate']:.2%}")
         
         return overall_validation
+
+    def _prepare_window_results_transposed_for_col_loc_retrospective(
+        self,
+        window_results: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """
+        col_loc（欄方向）回溯驗證：將視窗資料 transpose，以便沿用既有「依 start_loc_row 分群」的回溯流程。
+
+        實作預留（見 issues/回溯驗證方向性.iss）：
+        - 視窗內數值矩陣、row_names / column_names、與 LLM 可見的表格切片需與轉置後語意一致。
+        - 分群鍵在轉置空間仍走 start_loc_row，但其語意對應到原始表的 col；後續摘要宜標註 axis=col。
+        """
+        def _to_2d_matrix(values: Any) -> List[List[Any]]:
+            if not isinstance(values, list):
+                return []
+            if values and not isinstance(values[0], list):
+                return [[v] for v in values]
+            return values
+
+        def _transpose_matrix(values: List[List[Any]]) -> List[List[Any]]:
+            if not values:
+                return []
+            max_cols = max((len(r) for r in values), default=0)
+            padded = [list(r) + [None] * (max_cols - len(r)) for r in values]
+            return [list(col) for col in zip(*padded)] if padded else []
+
+        def _swap_dollar_coordinates(expr: Any) -> Any:
+            if not isinstance(expr, str):
+                return expr
+            text = str(expr)
+            # Treat $i as $(i,0) first, then swap (r,c)->(c,r)
+            text = re.sub(r'\$(\d+)', r'$(\1,0)', text)
+            text = re.sub(
+                r'\$\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)',
+                lambda m: f"$({m.group(2)},{m.group(1)})",
+                text,
+            )
+            return text
+
+        transposed_results: List[Dict[str, Any]] = []
+        for wr in window_results or []:
+            wr_t = copy.deepcopy(wr)
+            window_info = wr_t.setdefault('window_info', {})
+            prompt_data = wr_t.setdefault('prompt_data', {})
+
+            # Preserve source semantics for traceability
+            window_info['retrospective_axis'] = 'col'
+            window_info['retrospective_workspace'] = 'transposed'
+            window_info['original_start_loc'] = window_info.get('start_loc')
+            window_info['original_start_loc_row_name'] = window_info.get('start_loc_row_name')
+            window_info['original_start_loc_row_indicated'] = copy.deepcopy(
+                window_info.get('start_loc_row_indicated', [])
+            )
+
+            prompt_values = _to_2d_matrix(prompt_data.get('values', []))
+            if not prompt_values:
+                prompt_values = _to_2d_matrix(window_info.get('values', []))
+            transposed_values = _transpose_matrix(prompt_values)
+            prompt_data['values'] = transposed_values
+
+            row_names = list(
+                prompt_data.get('row_names')
+                or prompt_data.get('index_names')
+                or window_info.get('index_names')
+                or []
+            )
+            col_names = list(
+                prompt_data.get('column_names')
+                or window_info.get('column_names')
+                or []
+            )
+
+            # In transposed workspace, rows <- original columns; cols <- original rows
+            prompt_data['row_names'] = [str(v) for v in col_names]
+            prompt_data['index_names'] = [str(v) for v in col_names]
+            prompt_data['column_names'] = [str(v) for v in row_names]
+
+            if isinstance(window_info.get('values'), list):
+                window_info['values'] = _transpose_matrix(_to_2d_matrix(window_info.get('values', [])))
+            if isinstance(window_info.get('dataframe'), pd.DataFrame):
+                window_info['dataframe'] = window_info['dataframe'].T.copy()
+
+            if isinstance(window_info.get('index_names'), list):
+                window_info['index_names'] = [str(v) for v in col_names]
+            if isinstance(window_info.get('column_names'), list):
+                window_info['column_names'] = [str(v) for v in row_names]
+
+            shape = window_info.get('shape')
+            if isinstance(shape, tuple) and len(shape) == 2:
+                window_info['shape'] = (shape[1], shape[0])
+            elif isinstance(shape, list) and len(shape) == 2:
+                window_info['shape'] = [shape[1], shape[0]]
+
+            pos = window_info.get('position')
+            if isinstance(pos, dict):
+                pos['start_row'], pos['start_col'] = pos.get('start_col'), pos.get('start_row')
+                pos['end_row'], pos['end_col'] = pos.get('end_col'), pos.get('end_row')
+                window_info['position'] = pos
+                window_info['start_loc'] = pos.get('start_row')
+
+            if col_names:
+                window_info['start_loc_row_name'] = str(col_names[0])
+                window_info['start_loc_row_indicated'] = [str(v) for v in col_names]
+            else:
+                window_info['start_loc_row_name'] = str(window_info.get('start_loc_row_name', 'unknown'))
+                window_info['start_loc_row_indicated'] = [
+                    str(v) for v in window_info.get('start_loc_row_indicated', [])
+                ]
+
+            llm_result = wr_t.get('llm_result', {})
+            rules = llm_result.get('rules', []) if isinstance(llm_result, dict) else []
+            for rule in rules:
+                if not isinstance(rule, dict):
+                    continue
+                for key in ('equation', 'equation_with_indices', 'equation_with_values', 'rule'):
+                    if isinstance(rule.get(key), str):
+                        rule[key] = _swap_dollar_coordinates(rule[key])
+                eq_sides = rule.get('equation_sides')
+                if isinstance(eq_sides, list) and len(eq_sides) == 2:
+                    rule['equation_sides'] = [_swap_dollar_coordinates(eq_sides[0]), _swap_dollar_coordinates(eq_sides[1])]
+
+            validation = wr_t.get('validation', {})
+            if isinstance(validation, dict):
+                vd_list = validation.get('validation_details', [])
+                if isinstance(vd_list, list):
+                    for vd in vd_list:
+                        if not isinstance(vd, dict):
+                            continue
+                        if isinstance(vd.get('rule'), str):
+                            vd['rule'] = _swap_dollar_coordinates(vd['rule'])
+                        eq_sides = vd.get('equation_sides')
+                        if isinstance(eq_sides, list) and len(eq_sides) == 2:
+                            vd['equation_sides'] = [
+                                _swap_dollar_coordinates(eq_sides[0]),
+                                _swap_dollar_coordinates(eq_sides[1]),
+                            ]
+                            self._attach_equation_preview(vd)
+
+            transposed_results.append(wr_t)
+
+        return transposed_results
+
+    def _remap_retrospective_payload_from_transposed_workspace(
+        self,
+        transpose_axis_validation: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        將「在轉置工作空間跑完」的回溯結果轉回原始列/欄語意（需要時才呼叫；雙通道可先不硬轉）。
+
+        實作預留：
+        - window_info.position 的 row/col 與視窗邊界互換對應。
+        - start_loc_row_name 等欄位在 transpose 流程中對應原始 col_loc：可改名或加註 axis。
+        - 若輸出要統一語意，規律字串中的座標 $(r,c)$ 是否交換須與 row_names/column_names 互換一致。
+        """
+        def _swap_dollar_coordinates(expr: Any) -> Any:
+            if not isinstance(expr, str):
+                return expr
+            text = str(expr)
+            text = re.sub(r'\$(\d+)', r'$(\1,0)', text)
+            text = re.sub(
+                r'\$\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)',
+                lambda m: f"$({m.group(2)},{m.group(1)})",
+                text,
+            )
+            return text
+
+        remapped = copy.deepcopy(transpose_axis_validation or {})
+        if not isinstance(remapped, dict):
+            return {}
+
+        details = remapped.get('details', {})
+        if isinstance(details, dict):
+            new_details: Dict[Any, Any] = {}
+            for start_loc, group in details.items():
+                if not isinstance(group, dict):
+                    new_details[start_loc] = group
+                    continue
+                g = copy.deepcopy(group)
+
+                # Axis naming for output semantics (col-oriented retrospective)
+                g['start_loc_col_name'] = g.get('start_loc_row_name', 'unknown')
+                g['start_loc_col_indicated'] = copy.deepcopy(g.get('start_loc_row_indicated', []))
+                g['retrospective_axis'] = 'col'
+
+                for bucket_key in ('rule_details', 'passed_rules', 'degeneracy_filtered_rules'):
+                    bucket = g.get(bucket_key, {})
+                    if not isinstance(bucket, dict):
+                        continue
+
+                    remapped_bucket: Dict[str, Any] = {}
+                    for rule_key, payload in bucket.items():
+                        p = copy.deepcopy(payload)
+
+                        if isinstance(p, dict):
+                            if isinstance(p.get('rule_equation'), str):
+                                p['rule_equation'] = _swap_dollar_coordinates(p['rule_equation'])
+                            eq_sides = p.get('equation_sides')
+                            if isinstance(eq_sides, list) and len(eq_sides) == 2:
+                                p['equation_sides'] = [
+                                    _swap_dollar_coordinates(eq_sides[0]),
+                                    _swap_dollar_coordinates(eq_sides[1]),
+                                ]
+                            vd_list = p.get('validation_details')
+                            if isinstance(vd_list, list):
+                                for vd in vd_list:
+                                    if not isinstance(vd, dict):
+                                        continue
+                                    if isinstance(vd.get('rule'), str):
+                                        vd['rule'] = _swap_dollar_coordinates(vd['rule'])
+                                    eq_sides_vd = vd.get('equation_sides')
+                                    if isinstance(eq_sides_vd, list) and len(eq_sides_vd) == 2:
+                                        vd['equation_sides'] = [
+                                            _swap_dollar_coordinates(eq_sides_vd[0]),
+                                            _swap_dollar_coordinates(eq_sides_vd[1]),
+                                        ]
+                                        self._attach_equation_preview(vd)
+
+                        remapped_key = _swap_dollar_coordinates(rule_key) if isinstance(rule_key, str) else str(rule_key)
+                        remapped_bucket[remapped_key] = p
+
+                    g[bucket_key] = remapped_bucket
+
+                new_details[start_loc] = g
+
+            remapped['details'] = new_details
+
+        remapped['retrospective_axis'] = 'col'
+        remapped['total_start_loc_cols'] = remapped.get('total_start_loc_rows', 0)
+        remapped['valid_start_loc_cols'] = remapped.get('valid_start_loc_rows', 0)
+        remapped['start_loc_col_success_rate'] = remapped.get('start_loc_row_success_rate', 0.0)
+        remapped['validation_method'] = f"{remapped.get('validation_method', 'two_stage_retrospective')}_axis_col"
+        return remapped
+
+    def _run_retrospective_validate_for_axes(
+        self,
+        window_results: List[Dict[str, Any]],
+        *,
+        retrospective_axes: Literal["row", "col", "both"] = "row",
+    ) -> Dict[str, Any]:
+        """
+        以參數控制要走哪個方向的回溯驗證（預設 row_loc）；可選 col（transpose reuse）或 both 雙通道。
+
+        實作預留：
+        - retrospective_axes == "row"：直接呼叫 _retrospective_validate_start_loc_rows（現況）。
+        - "col"：_prepare_window_results_transposed_for_col_loc_retrospective 後再跑同一套回溯，
+          摘要鍵名與 start_loc_row_validation 分開或加 axis，避免與列向混淆。
+        - "both"：組出兩份（axis=row 與 axis=col），改動最小、風險最低；細節見 issue 文件。
+        """
+        if retrospective_axes not in {"row", "col", "both"}:
+            raise ValueError(
+                f"retrospective_axes 必須是 'row' | 'col' | 'both'，目前收到: {retrospective_axes}"
+            )
+
+        output: Dict[str, Any] = {
+            'retrospective_axes': retrospective_axes,
+            'start_loc_row_validation': None,
+            'start_loc_col_validation': None,
+        }
+
+        if retrospective_axes in {"row", "both"}:
+            output['start_loc_row_validation'] = self._retrospective_validate_start_loc_rows(
+                window_results
+            )
+
+        if retrospective_axes in {"col", "both"}:
+            transposed_windows = self._prepare_window_results_transposed_for_col_loc_retrospective(
+                window_results
+            )
+            transpose_axis_validation = self._retrospective_validate_start_loc_rows(
+                transposed_windows
+            )
+            output['start_loc_col_validation'] = self._remap_retrospective_payload_from_transposed_workspace(
+                transpose_axis_validation
+            )
+
+        return output
 
     def _apply_degeneracy_filters_to_passed_rules(
         self,
@@ -1995,16 +2302,30 @@ class MathRuleAnalyzer:
             threshold = LOGger.dcp(consistency_threshold)
 
             # overall_validation 來自 _retrospective_validate_start_loc_rows(...)
-            overall_validation = analysis_result.get('start_loc_row_validation', {})
-            details_by_start_loc = overall_validation.get('details', {})
+            summary_axis = 'row'
+            overall_validation = analysis_result.get('start_loc_row_validation', {}) or {}
+            details_by_start_loc = overall_validation.get('details', {}) or {}
+            if not details_by_start_loc:
+                col_validation = analysis_result.get('start_loc_col_validation', {}) or {}
+                col_details = col_validation.get('details', {}) or {}
+                if col_details:
+                    summary_axis = 'col'
+                    overall_validation = col_validation
+                    details_by_start_loc = col_details
 
             by_start_loc_row = {}
             start_loc_rows_with_any_pass = 0
 
             for start_loc, group in details_by_start_loc.items():
                 # 整理每個 start_loc_row 的通過規律
-                start_loc_row_name = group.get('start_loc_row_name', 'unknown')
-                start_loc_row_indicated = group.get('start_loc_row_indicated', [])
+                start_loc_row_name = group.get(
+                    'start_loc_row_name',
+                    group.get('start_loc_col_name', 'unknown'),
+                )
+                start_loc_row_indicated = group.get(
+                    'start_loc_row_indicated',
+                    group.get('start_loc_col_indicated', []),
+                )
                 rule_details = group.get('rule_details', {})
                 window_count = group.get('window_count', 0)
 
@@ -2040,6 +2361,7 @@ class MathRuleAnalyzer:
                 block = {
                     "start_loc_row_name": start_loc_row_name,
                     "start_loc_row_indicated": start_loc_row_indicated,
+                    "retrospective_axis": summary_axis,
                     "window_count": window_count,
                     "total_rules_found": len(rule_details),
                     "passed_rules_count": len(passed_rules),
@@ -2067,7 +2389,11 @@ class MathRuleAnalyzer:
                     'window_shape': analysis_result['window_scanning']['window_shape'],
                     'total_windows': analysis_result['window_scanning']['total_windows'],
                     'analyzed_windows': analysis_result['llm_analysis']['analyzed_windows'],
-                    'llm_mode': analysis_result['llm_analysis']['llm_mode']
+                    'llm_mode': analysis_result['llm_analysis']['llm_mode'],
+                    'retrospective_axes': analysis_result.get(
+                        'retrospective_axes',
+                        analysis_result.get('llm_analysis', {}).get('retrospective_axes', 'row'),
+                    ),
                 },
                 'summary': {
                     'total_rules_found': summary['statistics']['total_rules_found'],
@@ -2080,7 +2406,8 @@ class MathRuleAnalyzer:
                     'text_valid_ratio': summary['statistics']['text_valid_ratio'],
                     'consistency_valid_ratio': summary['statistics']['consistency_valid_ratio']
                 },
-                'start_loc_row_validation': analysis_result['start_loc_row_validation'],  # 起始列驗證結果
+                'start_loc_row_validation': analysis_result.get('start_loc_row_validation', {}),  # 起始列驗證結果
+                'start_loc_col_validation': analysis_result.get('start_loc_col_validation', {}),
                 'rule_details': summary['statistics']['rule_details']
             }
             
@@ -2172,7 +2499,12 @@ class MathRuleAnalyzer:
             'valid_rules_count': analysis_result.get('llm_analysis', {}).get('valid_rules_found'),
             'success_rate': analysis_result.get('llm_analysis', {}).get('overall_success_rate'),
             'llm_mode': analysis_result.get('llm_analysis', {}).get('llm_mode'),
+            'retrospective_axes': analysis_result.get(
+                'retrospective_axes',
+                analysis_result.get('llm_analysis', {}).get('retrospective_axes', 'row'),
+            ),
             'start_loc_row_validation': analysis_result.get('start_loc_row_validation'),
+            'start_loc_col_validation': analysis_result.get('start_loc_col_validation'),
             'detailed_analysis': analysis_result.get('detailed_results', []),
         }
 
@@ -2251,7 +2583,7 @@ def build_arg_parser():
     parser.add_argument('-wh', '--window-height', type=int, default=3,
                         help='Window height (default: 3)')
     parser.add_argument('-ww', '--window-width', type=int, default=1,
-                        help='Window width (default: 1)')
+                        help='Window width (default: 1; set -1 to auto-use max columns of effective table)')
     parser.add_argument('-sr', '--step-row', type=int, default=1,
                         help='Window scan row step (default: 1)')
     parser.add_argument('-sc', '--step-col', type=int, default=1,
@@ -2275,6 +2607,9 @@ def build_arg_parser():
     parser.add_argument('--no-phase2-overlap', action='store_true',
                         help='A線：關閉 Phase2 與 Phase1 回溯並行（改為 checkpoint 後再同步跑 Phase2）')
 
+    parser.add_argument('--retrospective-axes', type=str, default='row', choices=['row', 'col', 'both'],
+                        help='Retrospective validation axes (default: row)')
+
     return parser
 
 def main(args):
@@ -2291,6 +2626,7 @@ def main(args):
         quick_scan_seed=args.quick_scan_seed,
         use_phase1_global_llm_batch=args.phase1_global_llm_batch,
         phase2_overlap_phase1_retro=not args.no_phase2_overlap,
+        retrospective_axes=args.retrospective_axes,
     )
 
     result = analyzer.analyze_excel_file(args.excel_file, args.start_loc_row_name)
@@ -2331,6 +2667,7 @@ def main(args):
         print(f"rules_valid: {result.get('llm_analysis', {}).get('valid_rules_found')}")
         print(f"success_rate: {result.get('llm_analysis', {}).get('overall_success_rate', 0):.2%}")
         print(f"llm_mode: {result.get('llm_analysis', {}).get('llm_mode')}")
+        print(f"retrospective_axes: {result.get('retrospective_axes', result.get('llm_analysis', {}).get('retrospective_axes', 'row'))}")
         start_loc_row_validation = result.get('start_loc_row_validation', {}) or {}
         if start_loc_row_validation:
             print("\n=== Row Group Rule Validation Summary ===")
@@ -2357,6 +2694,12 @@ def main(args):
                         f"windows={window_count} rules={total_rules} "
                         f"passed={passed_rules} passed_rate={passed_rate:.2%}"
                     )
+        start_loc_col_validation = result.get('start_loc_col_validation', {}) or {}
+        if start_loc_col_validation:
+            print("\n=== Col Group Rule Validation Summary ===")
+            print(f"total_groups: {start_loc_col_validation.get('total_start_loc_cols', start_loc_col_validation.get('total_start_loc_rows'))}")
+            print(f"valid_groups: {start_loc_col_validation.get('valid_start_loc_cols', start_loc_col_validation.get('valid_start_loc_rows'))}")
+            print(f"group_success_rate: {start_loc_col_validation.get('start_loc_col_success_rate', start_loc_col_validation.get('start_loc_row_success_rate', 0)):.2%}")
         def _get_ts(key: str):
             val = analyzer.timer.get(key)
             if hasattr(val, "timestamp"):

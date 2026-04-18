@@ -483,6 +483,10 @@ def build_arg_parser_rules_only():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "xlsx-stdio":
+        from dataProcess import xlsx_stdio
+
+        raise SystemExit(xlsx_stdio.main(sys.argv[2:]))
     # If the first arg is "rules-only", use the lightweight rules-only flow.
     if len(sys.argv) > 1 and sys.argv[1] == "UR":
         parser = build_arg_parser_rules_only()

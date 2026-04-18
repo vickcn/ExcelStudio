@@ -14,10 +14,10 @@ try:
 except Exception:  # pragma: no cover
     pd = None
 
-# Ensure ContextParser is importable
-BASE = Path(r"C:\ML_HOME\DocumentManagerQAS")
-SRC_PATH = BASE / "src"
-sys.path.insert(0, str(SRC_PATH))
+# Ensure local ContextParser is importable
+DATA_PROCESS_DIR = Path(__file__).resolve().parent
+if str(DATA_PROCESS_DIR) not in sys.path:
+    sys.path.insert(0, str(DATA_PROCESS_DIR))
 from ContextParser import xlsx_parser as xp  # type: ignore
 
 DEFAULT_FILE = r"C:\ML_HOME\ExcelStudio\correct_simple.xlsx"
