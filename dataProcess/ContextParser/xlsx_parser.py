@@ -26,6 +26,9 @@ import logging
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
+from dataclasses import dataclass
+from openpyxl.utils import get_column_letter
+from copy import deepcopy as dcp
 
 try:
     import pandas as pd
@@ -131,6 +134,61 @@ def _log_prefix(color_name: str) -> str:
 # ============================================================
 # 輔助函式
 # ============================================================
+
+# dataclass reserved for next refactor; current pipeline still uses dict for backward compatibility
+@dataclass
+class HeaderInfo:
+    has_header_row: bool
+    has_header_col: bool
+    header_rows: list[int]
+    header_cols: list[int]
+    headers: list[str]
+    confidence: float
+
+
+@dataclass
+class IndexInfo:
+    has_index_col: bool
+    has_index_row: bool
+    index_cols: list[int]
+    index_rows: list[int]
+    index_values: list[str]
+    confidence: float
+
+
+@dataclass
+class TableMetadata:
+    memo: list[str]
+    formulas: list[dict]
+    images: list[dict]
+    merged_cells: list[dict]
+    original_bbox: tuple[int, int, int, int]
+    sheet_bbox: tuple[int, int, int, int] | None
+
+
+@dataclass
+class TableRegion:
+    table_id: int
+    sheet_name: str
+    sheet_index: int
+
+    bbox: tuple[int, int, int, int]
+    shape: tuple[int, int]
+    non_empty_count: int
+    density: float
+
+    table_df: Any
+    values: list[list[Any]]
+    markdown: str
+
+    header: HeaderInfo
+    index: IndexInfo
+    metadata: TableMetadata
+
+    region_type: str = "unknown"
+    confidence: float = 0.0
+    reason: str = ""
+
 
 def _require_dependencies() -> None:
     if not PANDAS_AVAILABLE:

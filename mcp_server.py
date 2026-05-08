@@ -819,6 +819,62 @@ async def export_json(
 
 
 @mcp.tool()
+async def capture_range_image(
+    workbook_id: str,
+    center_cell: str,
+    output_path: str,
+    sheet: Optional[str] = None,
+    up: int = 8,
+    down: int = 8,
+    left: int = 8,
+    right: int = 8,
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """以中心儲存格擴展範圍並輸出單張 PNG 截圖。"""
+    return await _xlsx_command(
+        "capture_range_image",
+        args=_clean_dict({
+            "workbook_id": workbook_id,
+            "sheet": sheet,
+            "center_cell": center_cell,
+            "output_path": output_path,
+            "up": up,
+            "down": down,
+            "left": left,
+            "right": right,
+        }),
+        request_id=request_id,
+    )
+
+
+@mcp.tool()
+async def capture_range_figure(
+    workbook_id: str,
+    output_path: str,
+    tasks: List[Dict[str, Any]],
+    sheet: Optional[str] = None,
+    ncols: int = 3,
+    panel_gap: int = 16,
+    panel_padding: int = 8,
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """批量截圖合併成同一張 PNG（多 panel）。"""
+    return await _xlsx_command(
+        "capture_range_figure",
+        args=_clean_dict({
+            "workbook_id": workbook_id,
+            "sheet": sheet,
+            "output_path": output_path,
+            "tasks": tasks,
+            "ncols": ncols,
+            "panel_gap": panel_gap,
+            "panel_padding": panel_padding,
+        }),
+        request_id=request_id,
+    )
+
+
+@mcp.tool()
 async def export_pdf(
     workbook_id: str,
     path: str,

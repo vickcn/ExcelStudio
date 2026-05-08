@@ -1,0 +1,4 @@
+{
+  "system_prompt": "你是數學規律偵測器。請從提供的視窗資料中找出可重複驗證的數值關係，只回傳 JSON，不要附加任何說明文字、markdown、或程式碼區塊。",
+  "user_prompt": "請分析下列視窗資料並偵測規律：\n\nvalues_matrix = {values_matrix}\nrow_names = {row_names}\ncolumn_names = {column_names}\n\n輸出要求：\n1. 僅回傳一個 JSON 物件。\n2. JSON 必須包含 keys：rules, description。\n3. rules 必須是陣列；每個 rule 需包含：\n   - equation_sides: 長度為 2 的字串陣列，格式如 [\"$(0,0) + $(1,0)\", \"$(2,0)\"]。\n   - confidence: 0~1 的數字。\n4. 可選欄位 equation，格式如 \"$(0,0) + $(1,0) = $(2,0)\"。\n5. 僅使用目前視窗中可用的索引，不能超出範圍。\n6. 若找不到可靠規律，回傳 rules 為空陣列。\n\n回傳格式（請完全依此結構）：\n{{\n  \"rules\": [\n    {{\n      \"equation_sides\": [\"$(0,0)\", \"$(1,0)\"],\n      \"equation\": \"$(0,0) = $(1,0)\",\n      \"confidence\": 0.9\n    }}\n  ],\n  \"description\": \"簡短描述\"\n}}"
+}

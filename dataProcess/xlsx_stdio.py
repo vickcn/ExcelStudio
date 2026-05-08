@@ -44,6 +44,7 @@ from openpyxl.utils import (
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.workbook.properties import CalcProperties
+from excel_screenshot import capture_excel_range_image, capture_excel_ranges_figure
 
 try:
     import openpyxl
@@ -137,6 +138,8 @@ class XlsxStdioServer:
             "set_dropdown_list": {"group": "validation", "summary": "Create list validation from values or formula."},
             "export_csv": {"group": "export", "summary": "Export a range or sheet to CSV."},
             "export_json": {"group": "export", "summary": "Export workbook or sheet data to JSON."},
+            "capture_range_image": {"group": "export", "summary": "Capture a sheet range around a center cell as PNG."},
+            "capture_range_figure": {"group": "export", "summary": "Capture multiple sheet ranges into one PNG figure."},
             "get_audit_log": {"group": "audit", "summary": "Return in-memory audit log."},
             "write_audit_log": {"group": "audit", "summary": "Persist audit log to disk."},
         }
@@ -1051,6 +1054,39 @@ class XlsxStdioServer:
         with open(abs_path, "w", encoding=DEFAULT_ENCODING) as f:
             json.dump(self._json_safe(payload), f, ensure_ascii=False, indent=2)
         return {"workbook_id": session.workbook_id, "path": abs_path, "mode": mode}
+
+    def cmd_capture_range_image(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        session = self._get_session(args)
+        ws = self._get_worksheet(session, args)
+        center_cell = self._required_str(args, "center_cell")
+        output_path = self._required_str(args, "output_path")
+        result = capture_excel_range_image(
+            ws=ws,
+            center_cell=center_cell,
+            up=int(args.get("up", 8)),
+            down=int(args.get("down", 8)),
+            left=int(args.get("left", 8)),
+            right=int(args.get("right", 8)),
+            output_path=output_path,
+        )
+        return {"workbook_id": session.workbook_id, **result}
+
+    def cmd_capture_range_figure(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        session = self._get_session(args)
+        ws = self._get_worksheet(session, args)
+        output_path = self._required_str(args, "output_path")
+        tasks = args.get("tasks")
+        if not isinstance(tasks, list) or not tasks:
+            raise XlsxStdioError("INVALID_ARGS", "'tasks' must be a non-empty array.")
+        result = capture_excel_ranges_figure(
+            ws=ws,
+            tasks=tasks,
+            output_path=output_path,
+            ncols=int(args.get("ncols", 3)),
+            panel_gap=int(args.get("panel_gap", 16)),
+            panel_padding=int(args.get("panel_padding", 8)),
+        )
+        return {"workbook_id": session.workbook_id, **result}
 
     # ------------------------------------------------------------------
     # Audit commands

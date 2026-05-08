@@ -20,6 +20,7 @@ tmp*
 *timer*.json
 *discovered_rules*.json
 prompts/*rule*.json
+!prompts/math_rule_detection.json
 prompts/*observe*.json
 *output*/
 issues*/*

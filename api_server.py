@@ -808,6 +808,38 @@ class GroupAggregateRequest(BaseModel):
     return_records: bool = False
     request_id: Optional[str] = None
 
+
+class CaptureRangeImageRequest(BaseModel):
+    workbook_id: str
+    sheet: Optional[str] = None
+    center_cell: str
+    output_path: str
+    up: int = 8
+    down: int = 8
+    left: int = 8
+    right: int = 8
+    request_id: Optional[str] = None
+
+
+class CaptureRangeFigureTask(BaseModel):
+    center_cell: str
+    up: int = 8
+    down: int = 8
+    left: int = 8
+    right: int = 8
+    label: Optional[str] = None
+
+
+class CaptureRangeFigureRequest(BaseModel):
+    workbook_id: str
+    sheet: Optional[str] = None
+    output_path: str
+    tasks: List[CaptureRangeFigureTask]
+    ncols: int = 3
+    panel_gap: int = 16
+    panel_padding: int = 8
+    request_id: Optional[str] = None
+
 def _run_xlsx_stdio_command(req: XlsxStdioCommandRequest) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "command": req.command,
@@ -1604,6 +1636,8 @@ def root():
             "POST /api/xlsx/command",
             "POST /api/xlsx/preview-group-aggregate",
             "POST /api/xlsx/group-aggregate",
+            "POST /api/xlsx/capture-range-image",
+            "POST /api/xlsx/capture-range-figure",
         ],
     }
 
@@ -1976,6 +2010,54 @@ async def api_xlsx_group_aggregate(req: GroupAggregateRequest):
             status_code=500,
             detail={
                 "message": "group_aggregate failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/xlsx/capture-range-image")
+async def api_xlsx_capture_range_image(req: CaptureRangeImageRequest):
+    try:
+        args = req.model_dump(exclude_none=True)
+        request_id = args.pop("request_id", None)
+        payload = XlsxStdioCommandRequest(
+            command="capture_range_image",
+            args=args,
+            request_id=request_id,
+        )
+        return await run_in_threadpool(_run_xlsx_stdio_command, payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "capture_range_image failed",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+
+@app.post("/api/xlsx/capture-range-figure")
+async def api_xlsx_capture_range_figure(req: CaptureRangeFigureRequest):
+    try:
+        args = req.model_dump(exclude_none=True)
+        request_id = args.pop("request_id", None)
+        payload = XlsxStdioCommandRequest(
+            command="capture_range_figure",
+            args=args,
+            request_id=request_id,
+        )
+        return await run_in_threadpool(_run_xlsx_stdio_command, payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "capture_range_figure failed",
                 "error": str(e),
                 "traceback": traceback.format_exc(),
             },
