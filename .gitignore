@@ -14,7 +14,7 @@
 *.env*
 tmp*
 *pyc*
-*.zip
+**.zip
 
 *analysis_result*.json
 *timer*.json
@@ -25,4 +25,9 @@ prompts/*observe*.json
 *output*/
 issues*/*
 storage*/*
+
+# Allow Codex skills tracked in-repo under .codex/skills.
+!.codex/
+!.codex/skills/
+!.codex/skills/**
 

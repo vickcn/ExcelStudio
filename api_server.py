@@ -24,6 +24,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+
 # ---------------------------------------------------------
 # Path bootstrap
 # ---------------------------------------------------------
@@ -42,7 +43,7 @@ import ExcelStudio
 from dataProcess import run_math_rule_analysis
 from dataProcess import rule_audit_mark_excel
 from xlsx_stdio import XlsxStdioServer
-
+from dataProcess.excel_inspector import inspect_workbook
 
 # ---------------------------------------------------------
 # FastAPI app
@@ -839,6 +840,14 @@ class CaptureRangeFigureRequest(BaseModel):
     panel_gap: int = 16
     panel_padding: int = 8
     request_id: Optional[str] = None
+
+
+class ExcelInspectRequest(BaseModel):
+    path: Optional[str] = Field(default=None, description="Excel file path")
+    file_path: Optional[str] = Field(default=None, description="Excel file path from upload API")
+    xlsx_path: Optional[str] = Field(default=None, description="Excel file path")
+    relation_max_k: int = Field(default=6, ge=1, le=20)
+
 
 def _run_xlsx_stdio_command(req: XlsxStdioCommandRequest) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
@@ -2062,6 +2071,19 @@ async def api_xlsx_capture_range_figure(req: CaptureRangeFigureRequest):
                 "traceback": traceback.format_exc(),
             },
         )
+    
+@app.post("/api/excel/inspect-json")
+async def api_excel_inspect_json(req: ExcelInspectRequest):
+    xlsx_path = req.path or req.file_path or req.xlsx_path
+    if not xlsx_path:
+        raise HTTPException(status_code=400, detail="Missing path/file_path/xlsx_path")
+    p = Path(xlsx_path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {p}")
+    try:
+        return inspect_workbook(p, relation_max_k=req.relation_max_k)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"inspect failed: {exc}")
 # ---------------------------------------------------------
 # Local run
 # ---------------------------------------------------------

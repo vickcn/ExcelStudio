@@ -13,10 +13,16 @@ import re
 import logging
 import uuid
 import math
+import base64
+import hashlib
+import io
 from typing import List, Dict, Any, Optional, Tuple, Union, Set
 from pathlib import Path
 import queue, threading, time
 import requests
+import zipfile
+import posixpath
+import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 
 import sys
@@ -24,7 +30,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from package import LOGger
 from package import dataframeprocedure as DFP
 from src.parallel_llm_executor import ParallelLLMExecutor
-from src.image_explainer_output import finalize_image_explainer_text
+from src.image_explainer_output import finalize_image_explainer_text, IMAGE_EXPLAINER_FAILURE_LINE
+
+try:
+    from PIL import Image
+    HAS_PILLOW = True
+except Exception:
+    HAS_PILLOW = False
 
 
 # 嘗試導入 chardet，如果沒有則使用備用方案
@@ -155,6 +167,17 @@ def safe_filename(filename: str) -> str:
     dirname = os.path.dirname(filename)
     # 避免空字串
     return os.path.join(dirname, basename) or "unnamed"
+
+
+def sanitize_excel_cell_text(value: Any) -> Any:
+    """
+    清理 Excel 儲存格不接受的控制字元，避免 openpyxl IllegalCharacterError。
+    保留 tab/newline/carriage return，其餘 C0 控制字元移除。
+    """
+    if value is None or isinstance(value, (int, float, bool)):
+        return value
+    text = value if isinstance(value, str) else str(value)
+    return re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", text)
 
 def parse_keywords_from_text(keywords_text: str, max_keywords: int = 5, min_keyword_length: int = 1) -> List[str]:
     """
@@ -334,6 +357,248 @@ def _normalize_multi_prompts_list(prompts: List[str]) -> List[str]:
         seen.add(s)
         normalized.append(s)
     return normalized
+
+
+def normalize_multi_prompts(value: Any) -> List[str]:
+    """Normalize multi_prompts from None, str, or list into a deduped ordered list."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return _normalize_multi_prompts_list([value])
+    if isinstance(value, list):
+        return _normalize_multi_prompts_list(value)
+    return _normalize_multi_prompts_list([str(value)])
+
+
+def merge_multi_prompts(sources: Any) -> List[str]:
+    """Merge multi_prompts from dict/list/string sources, preserving order and deduping."""
+    merged: List[str] = []
+    if not sources:
+        return []
+    if not isinstance(sources, list):
+        sources = [sources]
+    for source in sources:
+        if source is None:
+            continue
+        if isinstance(source, str):
+            merged.extend(normalize_multi_prompts(source))
+            continue
+        if isinstance(source, list):
+            merged.extend(normalize_multi_prompts(source))
+            continue
+        if isinstance(source, dict):
+            if source.get("multi_prompts") is not None:
+                merged.extend(normalize_multi_prompts(source.get("multi_prompts")))
+            meta = source.get("meta")
+            if isinstance(meta, dict) and meta.get("multi_prompts") is not None:
+                merged.extend(normalize_multi_prompts(meta.get("multi_prompts")))
+    return normalize_multi_prompts(merged)
+
+
+def is_enable_multi_prompts(kwargs: Optional[Dict[str, Any]] = None, default: bool = True) -> bool:
+    """Return whether extract/segment/chunk should generate multi_prompts."""
+    if not isinstance(kwargs, dict):
+        return default
+    value = kwargs.get("enable_multi_prompts", default)
+    if value is None:
+        return default
+    return bool(value)
+
+
+def attach_multi_prompts_meta(record: Dict[str, Any], prompts: Any) -> None:
+    """Attach normalized multi_prompts into record meta without clobbering other keys."""
+    meta = record.setdefault("meta", {})
+    meta["multi_prompts"] = normalize_multi_prompts(prompts)
+
+
+def attach_segment_multi_prompts_meta(segment_record: Dict[str, Any], source_paras: List[Dict[str, Any]]) -> None:
+    """Merge upstream unit meta.multi_prompts into a segment record."""
+    attach_multi_prompts_meta(segment_record, merge_multi_prompts(source_paras))
+
+
+def attach_segment_multi_prompts_by_orders(
+        segments: List[Dict[str, Any]],
+        unit_paras: List[Dict[str, Any]],
+        orders_key: str = 'orders',
+    ) -> None:
+    """Merge unit meta.multi_prompts into segments using tracked unit orders."""
+    if not segments or not unit_paras:
+        return
+    para_by_order: Dict[Any, Dict[str, Any]] = {}
+    for para in unit_paras:
+        order = para.get('order')
+        if order is not None:
+            para_by_order[order] = para
+    for seg in segments:
+        orders = seg.get(orders_key)
+        if isinstance(orders, list) and orders:
+            sources = [para_by_order[o] for o in orders if o in para_by_order]
+        elif len(segments) == 1:
+            sources = unit_paras
+        else:
+            sources = []
+        if sources:
+            attach_segment_multi_prompts_meta(seg, sources)
+
+
+def collect_chunk_llm_extraction_targets(
+        segments: List[Dict[str, Any]],
+        extract_kw_lbd: int,
+    ) -> Tuple[List[str], List[int]]:
+    """Select segments that still need chunk-stage keyword extraction."""
+    segments_to_extract: List[str] = []
+    segment_indices: List[int] = []
+    for idx, seg in enumerate(segments):
+        if merge_multi_prompts([seg]):
+            continue
+        unit_text = (seg.get("unit_text") or "").strip()
+        if len(unit_text) >= extract_kw_lbd:
+            segments_to_extract.append(unit_text)
+            segment_indices.append(idx)
+    return segments_to_extract, segment_indices
+
+
+def build_text_chunk_record(
+        seg: Dict[str, Any],
+        idx: int,
+        keywords: Optional[List[str]] = None,
+        enable_multi_prompts: bool = True,
+    ) -> Dict[str, Any]:
+    """Build chunk output while preserving upstream meta.multi_prompts when enabled."""
+    unit_text = (seg.get("unit_text") or "").strip()
+    tags = seg.get("tags", []) or []
+    record = {
+        "call_prompt": unit_text,
+        "indent_level": seg.get("indent_level", 0),
+        "order": seg.get("order", idx),
+        "multi_prompts": [],
+        "tags": tags,
+    }
+    if not enable_multi_prompts:
+        return record
+
+    upstream_mp = merge_multi_prompts([seg])
+    kw = keywords or []
+    merged_prompts = merge_multi_prompts([upstream_mp, kw, tags])
+    record["multi_prompts"] = merged_prompts
+    attach_multi_prompts_meta(record, upstream_mp)
+    return record
+
+
+def _load_extract_keywords_prompt_config(
+        prompt_config: Optional[Dict[str, Any]] = None,
+        prompt_file: Optional[Union[str, Path]] = None,
+    ) -> Optional[Dict[str, Any]]:
+    if prompt_config is not None:
+        return prompt_config
+    if prompt_file is None:
+        project_root = Path(__file__).parent.parent.parent
+        prompt_file = project_root / "prompt" / "extract_keywords.json"
+    else:
+        prompt_file = Path(prompt_file)
+    try:
+        with open(prompt_file, "r", encoding="utf-8-sig") as f:
+            return json.load(f)
+    except Exception as e:
+        m_logger.warning(f"無法載入關鍵字提取提示詞配置: {e}")
+        return None
+
+
+def batch_extract_multi_prompts(
+        texts: List[str],
+        *,
+        llm_base_url: Optional[str] = None,
+        prompt_config: Optional[Dict[str, Any]] = None,
+        prompt_file: Optional[Union[str, Path]] = None,
+        llm_provider: str = "remote",
+        llm_model: str = "remote8b",
+        min_text_length: int = 1,
+        batch_size: int = None,
+        timeout: int = 300,
+    ) -> List[List[str]]:
+    """
+    Batch extract multi_prompts via /chat/batch using extract_keywords prompt config.
+    Returns one keyword list per input text; falls back to empty lists on LLM failure.
+    """
+    if not texts:
+        return []
+
+    kw_config = _load_extract_keywords_prompt_config(prompt_config=prompt_config, prompt_file=prompt_file)
+    if not kw_config:
+        return [[] for _ in texts]
+
+    system_prompt = kw_config.get("system_prompt", "")
+    user_prompt_template = kw_config.get("user_prompt_template", "")
+    generation_config = kw_config.get("generation_config", {})
+    max_keywords = int(generation_config.get("max_keywords", 5))
+    min_keyword_length = int(generation_config.get("min_keyword_length", 1))
+    max_tokens = int(generation_config.get("max_new_tokens", 150))
+    temperature = float(generation_config.get("temperature", 0.3))
+
+    if not llm_base_url:
+        llm_base_url = m_config.get("llm", {}).get("base_url", "http://10.1.3.127:7017")
+
+    prompts: List[str] = []
+    index_map: List[int] = []
+    results: List[List[str]] = [[] for _ in texts]
+
+    for idx, text in enumerate(texts):
+        text_clean = (text or "").strip()
+        if len(text_clean) < min_text_length:
+            continue
+        text_sample = text_clean[:5000]
+        text_sample = text_sample.replace("，", ",").replace("：", ":").replace("；", ";")
+        user_prompt = user_prompt_template.format(content=text_sample)
+        prompts.append(user_prompt)
+        index_map.append(idx)
+
+    if not prompts:
+        return results
+
+    if batch_size is None:
+        batch_size = _BATCH_SIZE_LIMIT
+
+    batch_chat_url = f"{llm_base_url.rstrip('/')}/chat/batch"
+    outputs: List[str] = []
+
+    try:
+        for start in range(0, len(prompts), max(1, batch_size)):
+            batch_prompts = prompts[start:start + max(1, batch_size)]
+            payload = {
+                "prompts": batch_prompts,
+                "provider": llm_provider,
+                "model": llm_model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "system_prompt": system_prompt if system_prompt else None,
+                "parallel": True,
+                "max_batch_size": max(1, batch_size),
+            }
+            response = requests.post(batch_chat_url, json=payload, timeout=timeout)
+            response.raise_for_status()
+            batch_result = response.json()
+            batch_items = batch_result.get("results", [])
+            for item in batch_items:
+                if item.get("error"):
+                    outputs.append("")
+                else:
+                    result_obj = item.get("result", {})
+                    outputs.append((result_obj.get("output", "") or "").strip())
+    except Exception as e:
+        m_logger.warning(f"batch_extract_multi_prompts 失敗: {e}")
+        return results
+
+    for text_idx, output in zip(index_map, outputs):
+        if not output:
+            continue
+        keywords = parse_keywords_from_text(
+            output,
+            max_keywords=max_keywords,
+            min_keyword_length=min_keyword_length,
+        )
+        results[text_idx] = normalize_multi_prompts(keywords)
+
+    return results
 
 
 def _extract_system_collections_from_config(config: Optional[Dict[str, Any]]) -> set:
@@ -593,16 +858,39 @@ def dedup_multi_prompts_by_llm(
     return (cleaned, metas) if return_meta else cleaned
 
 
-def _load_image_explainer_prompt_template(config: Optional[Dict[str, Any]], log: logging.Logger) -> str:
-    """載入 image_explainer prompt 模板，失敗時回退內建預設。"""
+def _apply_document_brief_prefix(template: str, metadata: Optional[Dict[str, Any]]) -> str:
+    """將 metadata['document_brief'] 置於圖像說明 prompt 前綴（若有）。"""
+    if not template:
+        return ""
+    if not isinstance(metadata, dict):
+        return template
+    brief = metadata.get("document_brief")
+    if not brief or not str(brief).strip():
+        return template
+    return f"文件主旨／背景：{str(brief).strip()}\n\n{template}"
+
+
+def _load_image_explainer_prompt_template(
+        config: Optional[Dict[str, Any]],
+        log: logging.Logger,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+    """載入 image_explainer prompt 模板，失敗時回退內建預設；若有 document_brief 則加前綴。"""
     default_template = (
-        "請根據上下文描述圖片內容，並給 1-2 句總結。"
-        "如果上下文中有指示性的描述，是透過圖片來輔助說明的，"
-        "那你應該就圖像中的相對位置來補充上下文單純透過文字沒有表達出來的資訊。"
-        "而且：如果圖裡面有表格，請以md格式輸出前10行前10欄的內容；"
-        "如果圖裡面是座標xy chart，請描述座標軸意義與圖表類型"
+        "你是圖像內容分析器。請嚴格只輸出一個 JSON 物件，不要輸出 markdown code block、不要輸出額外說明。"
+        "JSON 欄位固定為：{\"has_table\": <true|false>, \"summary\": \"...\", \"markdown_table\": \"...\"}。"
+        "規則："
+        "1) 先對齊上文下文的文件主題或章節主旨，說明此圖如何支撐該主題（用途、結論或讀圖重點），避免只描述底色、漸層或框線等與主題無關的視覺外觀。"
+        "2) 若圖片中文字量明顯偏多（如合約條款、段落、清單、表單說明），且不屬於表格型圖片，請優先做逐字轉寫並完整保留原文內容；summary 欄位需放轉寫結果（可含換行）。僅在文字量少、難以辨識或非文字型圖片時，summary 才改為重點摘要。"
+        "3) 若圖片中有條列式文案（例如 1. / 1.1 / 2.、項次、符號清單），請逐條列出且保持原有層次與順序，不可合併、不可省略。"
+        "4) 若圖為報表／儀表板／統計或座標 xy chart，請在 summary 補充可辨識的標題、圖例、座標軸意義、時間區間、排名、關鍵數值與趨勢；看不清處可標註不確定。"
+        "5) 先判斷圖片是否含表格，有則 has_table=true，否則 false。"
+        "6) 若 has_table=true，markdown_table 必須輸出圖片中前 10 行前 10 欄的 markdown 表格（含表頭與分隔線）；若不足 10 行/欄則輸出實際可見範圍。此情況 summary 請限制為一句（<=80字），禁止貼出大量儲存格內容或公式。"
+        "7) 若 has_table=false，markdown_table 請輸出空字串。"
+        "8) 如果是空白表格範例，而且有明顯欄列標題，請在 summary 說明欄位用途，markdown_table 仍輸出可見表頭/欄位。但如果有內容的儲存格分布四散，請說明這份空白表格可能要如何填寫。"
     )
     cfg = config or {}
+    base = default_template
     try:
         project_root = Path(__file__).resolve().parent.parent.parent
         prompt_path = cfg.get('prompt_path', None) if isinstance(cfg, dict) else None
@@ -610,31 +898,298 @@ def _load_image_explainer_prompt_template(config: Optional[Dict[str, Any]], log:
 
         if not prompt_file.exists():
             log.warning(f"[_analyze_images_via_batch] prompt 檔案不存在，使用內建預設: {prompt_file}")
-            return default_template
-
-        with open(prompt_file, 'r', encoding='utf-8-sig') as f:
-            raw = f.read().strip()
-        if not raw:
-            log.warning(f"[_analyze_images_via_batch] prompt 檔案為空，使用內建預設: {prompt_file}")
-            return default_template
-
-        loaded = json.loads(raw)
-        if isinstance(loaded, str):
-            template = loaded.strip()
-            return template or default_template
-        if isinstance(loaded, dict):
-            for key in ('image_prompt_template', 'prompt_template', 'user_prompt_template'):
-                val = loaded.get(key)
-                if val is not None:
-                    template = str(val).strip()
-                    if template:
-                        return template
-        return default_template
+        else:
+            with open(prompt_file, 'r', encoding='utf-8-sig') as f:
+                raw = f.read().strip()
+            if not raw:
+                log.warning(f"[_analyze_images_via_batch] prompt 檔案為空，使用內建預設: {prompt_file}")
+            else:
+                loaded = json.loads(raw)
+                if isinstance(loaded, str):
+                    template = loaded.strip()
+                    base = template or default_template
+                elif isinstance(loaded, dict):
+                    picked = ""
+                    for key in ('image_prompt_template', 'prompt_template', 'user_prompt_template'):
+                        val = loaded.get(key)
+                        if val is not None:
+                            picked = str(val).strip()
+                            if picked:
+                                break
+                    base = picked if picked else default_template
+                else:
+                    base = default_template
     except Exception as e:
         log.warning(f"[_analyze_images_via_batch] 載入 image_explainer prompt 失敗，使用內建預設: {e}")
-        return default_template
+        base = default_template
+
+    return _apply_document_brief_prefix(base, metadata)
 
 
+def _apply_image_analysis_to_segments(
+        image_analysis_map: Dict[str, Any],
+        segments: List[Dict[str, Any]],
+        text_keys: List[str],
+        placeholder_pattern: str,
+        placeholder_replacements: List[str],
+        logger: Optional[logging.Logger] = None
+    ) -> None:
+    if not image_analysis_map:
+        return
+    placeholder_re = re.compile(placeholder_pattern)
+    for seg_idx, segment in enumerate(segments):
+        text_key = None
+        for key in text_keys:
+            if key in segment and segment.get(key):
+                text_key = key
+                break
+        if not text_key:
+            continue
+        current_text = segment.get(text_key, "")
+        current_text = current_text if isinstance(current_text, str) else str(current_text)
+        matched_ids = placeholder_re.findall(current_text)
+        if not matched_ids:
+            continue
+        appended_ids: Set[str] = set()
+        for match in matched_ids:
+            try:
+                iid = int(match)
+            except Exception:
+                continue
+            iid_key = str(iid)
+            analysis = image_analysis_map.get(iid_key)
+            if not analysis or not isinstance(analysis, dict):
+                continue
+            if "error" in analysis:
+                continue
+            summary = analysis.get("summary", "")
+            if not summary:
+                continue
+            summary = summary.strip()
+            if summary == IMAGE_EXPLAINER_FAILURE_LINE:
+                annotation_line = IMAGE_EXPLAINER_FAILURE_LINE
+            else:
+                hash_suffix = ""
+                image_hash = analysis.get("image_hash")
+                if isinstance(image_hash, str) and image_hash.strip():
+                    hash_suffix = f"|hash={image_hash.strip()}"
+                if analysis.get("annotation_type") == "supplemental_object":
+                    annotation_line = f"[補充物件內容|id={iid}{hash_suffix}] {summary}\n"
+                else:
+                    annotation_line = f"[圖像說明|id={iid}{hash_suffix}] {summary}\n"
+            if annotation_line in current_text:
+                continue
+            placeholders = _build_placeholders(iid_key, placeholder_replacements)
+            for ph in placeholders:
+                if ph in current_text:
+                    current_text = current_text.replace(ph, annotation_line)
+            if iid_key not in appended_ids:
+                segment.setdefault("image_analysis", []).append(analysis)
+                appended_ids.add(iid_key)
+        segment[text_key] = current_text
+
+
+def _get_text(segment: Dict[str, Any], text_keys: List[str]) -> str:
+    for key in text_keys:
+        if key in segment and segment.get(key):
+            value = segment.get(key)
+            return value if isinstance(value, str) else str(value)
+    return ""
+
+def _build_placeholders(image_id_str: str, placeholder_replacements: List[str]) -> List[str]:
+    placeholders = []
+    for template in placeholder_replacements:
+        if "{image_id}" in template:
+            placeholders.append(template.format(image_id=image_id_str))
+        else:
+            placeholders.append(template)
+    return placeholders
+
+
+def _compute_image_hash_from_metadata_row(image_row: Any) -> str:
+    if not isinstance(image_row, dict):
+        return ""
+    raw_bytes: Optional[bytes] = None
+    base64_value = image_row.get("base64")
+    if isinstance(base64_value, str) and base64_value.strip():
+        try:
+            raw_bytes = base64.b64decode(base64_value.strip(), validate=False)
+        except Exception:
+            raw_bytes = None
+    if raw_bytes is None:
+        image_url = image_row.get("image_url")
+        if isinstance(image_url, str) and image_url.startswith("data:"):
+            match = re.match(r'^data:[^;,]+;base64,(.*)$', image_url, flags=re.IGNORECASE | re.DOTALL)
+            if match:
+                try:
+                    raw_bytes = base64.b64decode((match.group(1) or "").strip(), validate=False)
+                except Exception:
+                    raw_bytes = None
+    if not raw_bytes:
+        return ""
+    return hashlib.sha256(raw_bytes).hexdigest()[:16]
+
+
+def _page_image_analysis_context_for_placeholder(
+        metadata: Optional[Dict[str, Any]],
+        image_id: int,
+        images: List[Any],
+    ) -> str:
+    """依圖所屬頁碼，帶入 metadata['page_image_analysis'] 的整頁預覽摘要。"""
+    if not isinstance(metadata, dict):
+        return ""
+    pia = metadata.get("page_image_analysis")
+    if not isinstance(pia, dict) or not pia:
+        return ""
+    if not isinstance(images, list) or image_id < 0 or image_id >= len(images):
+        return ""
+    img_row = images[image_id]
+    if not isinstance(img_row, dict):
+        return ""
+    pg = img_row.get("page")
+    if pg is None:
+        return ""
+    try:
+        pg_key = str(int(pg))
+    except Exception:
+        return ""
+    entry = pia.get(pg_key)
+    if not isinstance(entry, dict):
+        return ""
+    summ = entry.get("summary")
+    if summ is None or not str(summ).strip():
+        return ""
+    return f"本頁整頁視覺脈絡（整頁預覽摘要）：{str(summ).strip()}"
+
+
+def analyze_pdf_page_images_via_batch_common(
+        page_tasks: List[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
+        *,
+        llm_provider: str = 'openai',
+        llm_model: str = 'gpt4o_chat',
+        llm_base_url: Optional[str] = None,
+        max_images_per_batch: int = 20,
+        page_prompt_template: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+        logger: Optional[logging.Logger] = None,
+    ) -> Dict[str, Any]:
+    """
+    對 PDF 每一整頁光柵圖做批次視覺分析，結果寫入 metadata['page_image_analysis']。
+    page_tasks: [{'page': 1, 'image_url': 'data:image/png;base64,...'}, ...]
+    """
+    log = logger or m_logger
+    cfg = config or m_config
+    if not page_tasks:
+        return {}
+    if not llm_base_url:
+        llm_base_url = cfg.get('llm', {}).get('base_url', 'http://10.1.3.127:7017') if isinstance(cfg, dict) else 'http://10.1.3.127:7017'
+    if not page_prompt_template:
+        page_prompt_template = (
+            "這是 PDF 某一整頁的光柵化畫面。請用繁體中文約 200 字以內描述："
+            "版面區塊（標題、圖表、表格、列表）、主題與讀圖重點，協助後續對頁內小圖做定位理解；"
+            "勿逐像素描述背景或漸層。"
+        )
+    page_prompt_template = _apply_document_brief_prefix(page_prompt_template, metadata)
+    batch_chat_url = f"{llm_base_url.rstrip('/')}/chat/batch"
+    page_analysis: Dict[str, Any] = {}
+    for batch_start in range(0, len(page_tasks), max_images_per_batch):
+        batch_tasks = page_tasks[batch_start:batch_start + max_images_per_batch]
+        prompts = [f"{page_prompt_template}\n頁碼：{t.get('page')}" for t in batch_tasks]
+        payload = {
+            'prompts': prompts,
+            'provider': llm_provider,
+            'model': llm_model,
+            'max_tokens': 8000,
+            'temperature': 0.1,
+            'top_p': 0.95,
+            'images': [[t['image_url']] for t in batch_tasks],
+        }
+        try:
+            log.info(f"[analyze_pdf_page_images] 發送整頁批次: {len(batch_tasks)} 頁")
+            resp = requests.post(batch_chat_url, json=payload, timeout=600)
+            resp.raise_for_status()
+            batch_data = resp.json()
+            results = batch_data.get('results', [])
+            for i, task in enumerate(batch_tasks):
+                pg = task.get('page')
+                if i < len(results):
+                    result_item = results[i]
+                    if result_item.get('error'):
+                        log.warning(f"[analyze_pdf_page_images] 第 {pg} 頁分析失敗: {result_item.get('error')}")
+                        page_analysis[str(pg)] = {'page': pg, 'error': result_item.get('error'), 'summary': ''}
+                    else:
+                        result = result_item.get('result') or {}
+                        output = result.get('output', '')
+                        output = finalize_image_explainer_text(output)
+                        page_analysis[str(pg)] = {
+                            'summary': output,
+                            'page': pg,
+                            'model': llm_model,
+                        }
+                else:
+                    page_analysis[str(pg)] = {'page': pg, 'error': 'No response', 'summary': ''}
+        except requests.RequestException as e:
+            log.error(f"[analyze_pdf_page_images] 批次請求失敗: {e}")
+            for task in batch_tasks:
+                pg = task.get('page')
+                page_analysis[str(pg)] = {'page': pg, 'error': str(e), 'summary': ''}
+    if isinstance(metadata, dict) and page_analysis:
+        existing = metadata.get('page_image_analysis')
+        merged: Dict[str, Any] = {}
+        if isinstance(existing, dict):
+            merged.update(existing)
+        merged.update(page_analysis)
+        metadata['page_image_analysis'] = merged
+    log.info(f"[analyze_pdf_page_images] 完成整頁分析，共 {len(page_analysis)} 頁")
+    return {'page_image_analysis': page_analysis, 'pages_analyzed': len(page_analysis)}
+
+
+def _normalize_image_data_url_for_llm(
+        image_url: str,
+        logger: Optional[logging.Logger] = None
+    ) -> Tuple[str, bool]:
+    """
+    將不支援的 data URI 格式轉為 PNG data URI，避免圖片 API 拒收。
+    """
+    log = logger or m_logger
+    if not image_url or not isinstance(image_url, str):
+        return image_url, False
+    if not image_url.startswith("data:"):
+        return image_url, False
+
+    match = re.match(r'^data:([^;,]+);base64,(.*)$', image_url, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return image_url, False
+
+    mime = (match.group(1) or "").strip().lower()
+    b64_data = (match.group(2) or "").strip()
+    supported_mimes = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+
+    if not HAS_PILLOW:
+        log.warning(f"[_normalize_image_data_url_for_llm] Pillow 不可用，無法轉換格式: {mime}")
+        return image_url, False
+
+    try:
+        raw = base64.b64decode(b64_data)
+
+        # 一律重編碼為 PNG，避免「宣告 MIME 與實際編碼」不一致造成下游拒收。
+        with Image.open(io.BytesIO(raw)) as img:
+            if img.mode in ("RGBA", "LA", "P"):
+                img = img.convert("RGBA")
+            elif img.mode not in ("RGB", "RGBA", "L", "LA"):
+                img = img.convert("RGB")
+            out_buf = io.BytesIO()
+            img.save(out_buf, format="PNG")
+            out_b64 = base64.b64encode(out_buf.getvalue()).decode("utf-8")
+        normalized = f"data:image/png;base64,{out_b64}"
+        # 若原本已是可用 PNG 且內容未變，回報未轉換，減少無意義 log。
+        if mime in supported_mimes and normalized == image_url:
+            return image_url, False
+        return normalized, True
+    except Exception as e:
+        log.warning(f"[_normalize_image_data_url_for_llm] 轉換失敗 mime={mime}: {e}")
+        return image_url, False
 
 
 def analyze_images_via_batch_common(
@@ -645,19 +1200,30 @@ def analyze_images_via_batch_common(
         llm_model: str = 'gpt4o_chat',
         llm_base_url: Optional[str] = None,
         enable_image_llm: bool = True,
-        image_context_window: int = 200,
+        image_context_window: int = 200, # 可能影響到速度
         max_images_per_batch: int = 50,
         image_prompt_template: Optional[str] = None,
         placeholder_pattern: Optional[str] = None,
         placeholder_replacements: Optional[Union[str, List[str]]] = None,
         text_keys: Optional[List[str]] = None,
         config: Optional[Dict[str, Any]] = None,
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
+        parser_type: Optional[str] = None,
+        fusion_overrides: Optional[Dict[str, Any]] = None,
+        analysis_only: bool = False,
     ) -> Dict[str, Any]:
     """
     Shared image analysis for parsers. Scans placeholders, calls /chat/batch,
     and inserts summaries back into segments and metadata.
     """
+    timing_t0 = time.perf_counter()
+    timing_info: Dict[str, float] = {
+        "prepare_tasks_seconds": 0.0,
+        "batch_api_seconds": 0.0,
+        "apply_segments_seconds": 0.0,
+        "page_fusion_seconds": 0.0,
+        "total_seconds": 0.0,
+    }
     log = logger or m_logger
     cfg = config or m_config
 
@@ -674,7 +1240,9 @@ def analyze_images_via_batch_common(
         llm_base_url = cfg.get('llm', {}).get('base_url', 'http://10.1.3.127:7017') if isinstance(cfg, dict) else 'http://10.1.3.127:7017'
 
     if not image_prompt_template:
-        image_prompt_template = _load_image_explainer_prompt_template(cfg, log)
+        image_prompt_template = _load_image_explainer_prompt_template(cfg, log, metadata)
+    else:
+        image_prompt_template = _apply_document_brief_prefix(image_prompt_template, metadata)
 
     if not placeholder_pattern:
         placeholder_pattern = r'\[IMAGE_PLACEHOLDER_(\d+)\]'
@@ -687,72 +1255,14 @@ def analyze_images_via_batch_common(
         placeholder_replacements = ["[IMAGE_PLACEHOLDER_{image_id}]"]
     elif isinstance(placeholder_replacements, str):
         placeholder_replacements = [placeholder_replacements]
-
-    def _get_text(segment: Dict[str, Any]) -> str:
-        for key in text_keys:
-            if key in segment and segment.get(key):
-                value = segment.get(key)
-                return value if isinstance(value, str) else str(value)
-        return ""
-
-    def _build_placeholders(image_id_str: str) -> List[str]:
-        placeholders = []
-        for template in placeholder_replacements:
-            if "{image_id}" in template:
-                placeholders.append(template.format(image_id=image_id_str))
-            else:
-                placeholders.append(template)
-        return placeholders
-
-    def _apply_image_analysis_to_segments(image_analysis_map: Dict[str, Any]) -> None:
-        if not image_analysis_map:
-            return
-        for seg_idx, segment in enumerate(segments):
-            text_key = None
-            for key in text_keys:
-                if key in segment and segment.get(key):
-                    text_key = key
-                    break
-            if not text_key:
-                continue
-            current_text = segment.get(text_key, "")
-            current_text = current_text if isinstance(current_text, str) else str(current_text)
-            matched_ids = placeholder_re.findall(current_text)
-            if not matched_ids:
-                continue
-            appended_ids: Set[str] = set()
-            for match in matched_ids:
-                try:
-                    iid = int(match)
-                except Exception:
-                    continue
-                iid_key = str(iid)
-                analysis = image_analysis_map.get(iid_key)
-                if not analysis or not isinstance(analysis, dict):
-                    continue
-                if "error" in analysis:
-                    continue
-                summary = analysis.get("summary", "")
-                if not summary:
-                    continue
-                annotation_line = f"[圖像說明] {summary}"
-                if annotation_line in current_text:
-                    continue
-                placeholders = _build_placeholders(iid_key)
-                for ph in placeholders:
-                    if ph in current_text:
-                        current_text = current_text.replace(ph, f"{ph}\n{annotation_line}")
-                if iid_key not in appended_ids:
-                    segment.setdefault("image_analysis", []).append(analysis)
-                    appended_ids.add(iid_key)
-            segment[text_key] = current_text
-
+        
     image_tasks: List[Dict[str, Any]] = []
     seen_image_ids: Set[int] = set()
     placeholder_ref_total = 0
 
+    t_stage = time.perf_counter()
     for seg_idx, segment in enumerate(segments):
-        text = _get_text(segment)
+        text = _get_text(segment, text_keys)
         if not text:
             log.warning(f"[_analyze_images_via_batch] 段落 {seg_idx} 無文字內容")
             continue
@@ -776,26 +1286,48 @@ def analyze_images_via_batch_common(
             front_text = ""
             back_text = ""
             if seg_idx > 0:
-                prev_text = _get_text(segments[seg_idx - 1])
+                prev_text = _get_text(segments[seg_idx - 1], text_keys)
                 front_text = prev_text[-image_context_window:] if len(prev_text) > image_context_window else prev_text
             if seg_idx < len(segments) - 1:
-                next_text = _get_text(segments[seg_idx + 1])
+                next_text = _get_text(segments[seg_idx + 1], text_keys)
                 back_text = next_text[:image_context_window] if len(next_text) > image_context_window else next_text
 
             if front_text or back_text:
                 prompt = f"{image_prompt_template}\n上文：{front_text}\n下文：{back_text}"
             else:
                 prompt = image_prompt_template
+            page_ctx = _page_image_analysis_context_for_placeholder(metadata, image_id, images)
+            if page_ctx:
+                prompt = f"{prompt}\n{page_ctx}"
 
             img_data = images[image_id]
             image_url = None
             if isinstance(img_data, dict):
+                shape_ctx = str(img_data.get("context_text") or "").strip()
+                if shape_ctx:
+                    prompt = f"{prompt}\n同頁可讀文字參考：{shape_ctx}"
+                if str(img_data.get("source") or "") == "slide_screenshot_fallback":
+                    prompt = (
+                        f"{prompt}\n請僅補充『同頁可讀文字參考』未涵蓋的物件資訊；"
+                        f"不要重述已出現內容，若無新增資訊請回覆空字串。"
+                    )
                 if 'base64' in img_data:
                     mime = img_data.get('mime', 'image/jpeg')
                     base64_str = img_data['base64']
                     image_url = f"data:{mime};base64,{base64_str}"
                 elif 'image_url' in img_data:
                     image_url = img_data['image_url']
+
+            if image_url:
+                image_url, converted = _normalize_image_data_url_for_llm(image_url, logger=log)
+                if converted:
+                    log.debug(f"[_analyze_images_via_batch] 圖像 ID {image_id} 已轉為 PNG 後送出")
+                if image_url.startswith("data:"):
+                    m = re.match(r'^data:([^;,]+);base64,', image_url, flags=re.IGNORECASE)
+                    mime_after = (m.group(1).strip().lower() if m else "")
+                    if mime_after and mime_after not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+                        log.warning(f"[_analyze_images_via_batch] 圖像 ID {image_id} 格式仍不支援，略過: {mime_after}")
+                        image_url = None
 
             if not image_url:
                 log.warning(f"[_analyze_images_via_batch] 圖像 ID {image_id} 無法取得圖像資料")
@@ -806,8 +1338,14 @@ def analyze_images_via_batch_common(
                 'image_url': image_url,
                 'prompt': prompt,
                 'segment_idx': seg_idx,
-                'placeholder_match': match
+                'sheet_name': segment.get('sheet_name'),
+                'placeholder_match': match,
+                'image_hash': _compute_image_hash_from_metadata_row(img_data),
+                'submitted_at': None,
             })
+            if isinstance(img_data, dict) and image_tasks[-1].get('image_hash'):
+                img_data['image_hash'] = image_tasks[-1]['image_hash']
+    timing_info["prepare_tasks_seconds"] = round(time.perf_counter() - t_stage, 3)
 
     unique_image_count = len(seen_image_ids)
     existing_ia = metadata.get("image_analysis") if isinstance(metadata, dict) else None
@@ -839,11 +1377,15 @@ def analyze_images_via_batch_common(
 
         for batch_start in range(0, len(image_tasks), max_images_per_batch):
             batch_tasks = image_tasks[batch_start:batch_start + max_images_per_batch]
+            t_batch = time.perf_counter()
+            for task in batch_tasks:
+                task['submitted_at'] = t_batch
             payload = {
                 'prompts': [task['prompt'] for task in batch_tasks],
                 'provider': llm_provider,
                 'model': llm_model,
-                'max_tokens': 12000,
+                # 'max_tokens': 12000,
+                'max_tokens': 120000,
                 'temperature': 0.1,
                 'top_p': 0.95,
                 'images': [[task['image_url']] for task in batch_tasks]
@@ -860,12 +1402,19 @@ def analyze_images_via_batch_common(
                     if i < len(results):
                         result_item = results[i]
                         if result_item.get('error'):
+                            elapsed = round(time.perf_counter() - (task.get('submitted_at') or t_batch), 3)
                             log.warning(f"[_analyze_images_via_batch] 圖像 ID {task['image_id']} 分析失敗: {result_item['error']}")
                             image_analysis[str(task['image_id'])] = {
                                 'error': result_item['error'],
-                                'image_id': task['image_id']
+                                'image_id': task['image_id'],
+                                'segment_idx': task['segment_idx'],
+                                'sheet_name': task.get('sheet_name'),
+                                'image_hash': task.get('image_hash') or "",
+                                'elapsed_seconds': elapsed,
                             }
+                            log.info(f"[_analyze_images_via_batch] 圖像 ID {task['image_id']} 解析耗時={elapsed}s (error)")
                         else:
+                            elapsed = round(time.perf_counter() - (task.get('submitted_at') or t_batch), 3)
                             result = result_item.get('result') or {}
                             output = result.get('output', '')
                             # 圖文解釋：後續在此銜接 has_table / md 表格檢查與重試（見 src.image_explainer_output）
@@ -874,21 +1423,47 @@ def analyze_images_via_batch_common(
                             usage = result.get('usage') or {}
                             total_tokens = usage.get('total_tokens', 0) if isinstance(usage, dict) else 0
 
+                            prompt_tokens = usage.get('prompt_tokens', 0) if isinstance(usage, dict) else 0
+                            completion_tokens = usage.get('completion_tokens', 0) if isinstance(usage, dict) else 0
+                            provider_key = str(llm_provider or "openai").strip().lower()
+                            provider_name = "OpenAI" if provider_key == "openai" else str(llm_provider or "Unknown")
+
                             image_analysis[str(task['image_id'])] = {
                                 'summary': output,
                                 'prompt_used': task['prompt'],
                                 'model': llm_model,
+                                'image_hash': task.get('image_hash') or "",
                                 'cost': cost,
                                 'tokens': total_tokens,
+                                'prompt_tokens': prompt_tokens,
+                                'completion_tokens': completion_tokens,
+                                'usage': {
+                                    'cost_types': {
+                                        provider_name: {
+                                            'tokens_in': prompt_tokens,
+                                            'tokens_out': completion_tokens,
+                                            'model': llm_model
+                                        }
+                                    }
+                                },
                                 'image_id': task['image_id'],
-                                'segment_idx': task['segment_idx']
+                                'segment_idx': task['segment_idx'],
+                                'sheet_name': task.get('sheet_name'),
+                                'elapsed_seconds': elapsed,
                             }
+                            log.info(f"[_analyze_images_via_batch] 圖像 ID {task['image_id']} 解析耗時={elapsed}s")
                     else:
+                        elapsed = round(time.perf_counter() - (task.get('submitted_at') or t_batch), 3)
                         log.warning(f"[_analyze_images_via_batch] 圖像 ID {task['image_id']} 沒有對應的回覆")
                         image_analysis[str(task['image_id'])] = {
                             'error': 'No response',
-                            'image_id': task['image_id']
+                            'image_id': task['image_id'],
+                            'segment_idx': task['segment_idx'],
+                            'sheet_name': task.get('sheet_name'),
+                            'image_hash': task.get('image_hash') or "",
+                            'elapsed_seconds': elapsed,
                         }
+                        log.info(f"[_analyze_images_via_batch] 圖像 ID {task['image_id']} 解析耗時={elapsed}s (no_response)")
 
                 batch_cost = batch_data.get('batch_cost_usd', 0)
                 batch_token_summary = batch_data.get('batch_token_summary') or {}
@@ -896,28 +1471,141 @@ def analyze_images_via_batch_common(
                     batch_token_summary = {}
                 log.info(f"[_analyze_images_via_batch] 批次 {batch_start//max_images_per_batch + 1} 完成: 費用={batch_cost}, tokens={batch_token_summary.get('total_tokens', 0)}")
 
+                timing_info["batch_api_seconds"] += (time.perf_counter() - t_batch)
             except requests.RequestException as e:
                 log.error(f"[_analyze_images_via_batch] 批次請求失敗: {e}")
                 for task in batch_tasks:
+                    elapsed = round(time.perf_counter() - (task.get('submitted_at') or t_batch), 3)
                     image_analysis[str(task['image_id'])] = {
                         'error': str(e),
-                        'image_id': task['image_id']
+                        'image_id': task['image_id'],
+                        'segment_idx': task['segment_idx'],
+                        'sheet_name': task.get('sheet_name'),
+                        'image_hash': task.get('image_hash') or "",
+                        'elapsed_seconds': elapsed,
                     }
+                    log.info(f"[_analyze_images_via_batch] 圖像 ID {task['image_id']} 解析耗時={elapsed}s (request_exception)")
+                timing_info["batch_api_seconds"] += (time.perf_counter() - t_batch)
 
         if image_analysis and isinstance(metadata, dict):
             metadata['image_analysis'] = image_analysis
 
-    _apply_image_analysis_to_segments(image_analysis)
+            # Aggregate image-analysis usage for downstream consumers.
+            provider_usage_map: Dict[str, Dict[str, Any]] = {}
+            image_count = 0
+            for ia in image_analysis.values():
+                if not isinstance(ia, dict):
+                    continue
+                if ia.get("error"):
+                    continue
+                image_count += 1
+                usage_obj = ia.get("usage") if isinstance(ia.get("usage"), dict) else {}
+                cost_types = usage_obj.get("cost_types") if isinstance(usage_obj.get("cost_types"), dict) else {}
+                for provider_name, provider_info in cost_types.items():
+                    if not isinstance(provider_info, dict):
+                        continue
+                    tokens_in = int(provider_info.get("tokens_in", 0) or 0)
+                    tokens_out = int(provider_info.get("tokens_out", 0) or 0)
+                    model_name = provider_info.get("model")
+                    entry = provider_usage_map.setdefault(
+                        str(provider_name),
+                        {"tokens_in": 0, "tokens_out": 0, "model": model_name}
+                    )
+                    entry["tokens_in"] += tokens_in
+                    entry["tokens_out"] += tokens_out
+                    if not entry.get("model") and model_name:
+                        entry["model"] = model_name
+
+            metadata["usage"] = {
+                "cost_types": provider_usage_map,
+                "image_count": image_count
+            }
+            try:
+                from src.tb11_usage_tracker import accumulate_usage_payload
+                accumulate_usage_payload(metadata["usage"], request_count=image_count)
+            except Exception:
+                pass
+
+    t_stage = time.perf_counter()
+    for iid, analysis in (image_analysis or {}).items():
+        try:
+            ii = int(iid)
+        except Exception:
+            continue
+        if 0 <= ii < len(images):
+            img_row = images[ii]
+            if isinstance(img_row, dict) and str(img_row.get("source") or "") == "slide_screenshot_fallback":
+                if isinstance(analysis, dict):
+                    analysis["annotation_type"] = "supplemental_object"
+
+    if analysis_only:
+        timing_info["apply_segments_seconds"] = 0.0
+        timing_info["page_fusion_seconds"] = 0.0
+        timing_info["total_seconds"] = round(time.perf_counter() - timing_t0, 3)
+        if isinstance(metadata, dict):
+            metadata["image_analysis_timing"] = timing_info
+        return {
+            'image_analysis': image_analysis,
+            'total_analyzed': len(image_analysis),
+            'total_errors': sum(1 for v in image_analysis.values() if isinstance(v, dict) and 'error' in v),
+            'timing': timing_info,
+            'analysis_only': True,
+        }
+
+    _apply_image_analysis_to_segments(
+        image_analysis_map=image_analysis,
+        segments=segments,
+        text_keys=text_keys,
+        placeholder_pattern=placeholder_pattern,
+        placeholder_replacements=placeholder_replacements,
+        logger=log,
+    )
+
+    fusion_result: Dict[str, Any] = {}
+    t_fusion = time.perf_counter()
+    try:
+        from src.image_page_fusion import run_suspicious_page_fusion
+        pt = str(parser_type or (metadata or {}).get("parser_type") or "").strip().lower()
+        if pt in ("pdf", "ppt") and image_analysis:
+            fusion_result = run_suspicious_page_fusion(
+                segments=segments,
+                metadata=metadata,
+                image_analysis=image_analysis,
+                parser_type=pt,
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                llm_base_url=llm_base_url,
+                text_keys=text_keys,
+                config=cfg,
+                fusion_overrides=fusion_overrides,
+                logger=log,
+            )
+    except Exception as e:
+        log.warning(f"[_analyze_images_via_batch] 可疑頁融合略過: {e}")
+    timing_info["page_fusion_seconds"] = round(time.perf_counter() - t_fusion, 3)
 
     log.info(f"[_analyze_images_via_batch] 完成圖像分析，共 {len(image_analysis)} 個結果")
 
+    timing_info["apply_segments_seconds"] = round(time.perf_counter() - t_stage, 3)
+    timing_info["batch_api_seconds"] = round(timing_info["batch_api_seconds"], 3)
+    timing_info["total_seconds"] = round(time.perf_counter() - timing_t0, 3)
+    if isinstance(metadata, dict):
+        metadata["image_analysis_timing"] = timing_info
     return {
         'image_analysis': image_analysis,
         'total_analyzed': len(image_analysis),
-        'total_errors': sum(1 for v in image_analysis.values() if 'error' in v)
+        'total_errors': sum(1 for v in image_analysis.values() if 'error' in v),
+        'timing': timing_info,
     }
 
 
+def _norm_zip_path(path: str) -> str:
+        p = (path or '').replace('\\', '/')
+        p = posixpath.normpath(p)
+        return p.lstrip('./')
+
+def _resolve_target(base_path: str, target: str) -> str:
+    return _norm_zip_path(posixpath.join(posixpath.dirname(base_path), target or ''))
 
 def segment_by_custom_pattern(text: str, separator: str) -> List[str]:
     """
@@ -3325,6 +4013,20 @@ def split_text(text: str, max_length: int = 1000, min_length: int = 50) -> List[
     
     return chunks
 
+def _jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if hasattr(value, "model_dump"):
+        try:
+            return _jsonable(value.model_dump())
+        except Exception:
+            return str(value)
+    return str(value)
+
 class ContextParser:
     """文件書寫模式檢測與分段策略解析器"""
     
@@ -3335,13 +4037,21 @@ class ContextParser:
     PATTERN_STRUCTURED_DOC = "structured_doc"
     PATTERN_PLAIN_TEXT = "plain_text"  # 預設模式
     
-    def __init__(self, llm_service, config: Dict[str, Any]):
+    def __init__(
+            self,
+            llm_service,
+            config: Dict[str, Any],
+            llm_provider: Optional[str] = None,
+            llm_model: Optional[str] = None,
+        ):
         """
         初始化 ContextParser
         
         Args:
             llm_service: LLM 服務實例（用於模式檢測）
             config: 系統配置字典
+            llm_provider: 覆寫 config.llm.chat_provider（CLI/worker 優先）
+            llm_model: 覆寫 config.llm.chat_model（CLI/worker 優先）
         """
         self.llm_service = llm_service
         self.config = config
@@ -3352,8 +4062,8 @@ class ContextParser:
         segment_config = llm_config.get('segment', {})
         self.llm_temperature = segment_config.get('temperature', 0.3)
         self.llm_max_tokens = segment_config.get('max_prompt_length', 512)  # 使用 max_prompt_length 作為 max_tokens
-        self.llm_provider = llm_config.get('chat_provider', 'remote')
-        self.llm_model = llm_config.get('chat_model', 'remote8b')
+        self.llm_provider = llm_provider or llm_config.get('chat_provider', 'remote')
+        self.llm_model = llm_model or llm_config.get('chat_model', 'remote8b')
         
         # 載入配置檔案
         self.base_path = Path(__file__).parent
@@ -3417,6 +4127,21 @@ class ContextParser:
             if self.logger:
                 self.logger.warning(f"初始化 parallel_executor 失敗，改用串行: {e}")
             self.parallel_executor = None
+
+    def _chat_provider_model_for_requests(self) -> Tuple[str, str]:
+        """內部 LLM 請求統一使用 self.llm_provider / self.llm_model（可被 CLI 覆寫）。"""
+        provider = str(self.llm_provider or 'remote')
+        model = str(self.llm_model or 'remote8b')
+        if provider == 'openai':
+            if model == 'gpt-3.5-turbo':
+                model = 'gpt35_chat'
+            elif model == 'gpt-4o':
+                model = 'gpt4o_chat'
+            elif model == 'gpt-4o-mini':
+                model = 'o4_chat'
+            elif model == 'gpt-4':
+                model = 'gpt4_chat'
+        return provider, model
     
     def _load_config(self, filename: str) -> Dict[str, Any]:
         """載入配置檔案（從 config 資料夾）"""
@@ -6999,21 +7724,7 @@ class ContextParser:
         }
         user_prompt = user_prompt_template.format(**input_data)
         
-        # 獲取 LLM 配置
-        llm_config = self.config.get('llm', {})
-        chat_provider = llm_config.get('chat_provider', 'remote')
-        chat_model = llm_config.get('chat_model', 'remote8b')
-        
-        # 模型名称转换
-        if chat_provider == 'openai':
-            if chat_model == 'gpt-3.5-turbo':
-                chat_model = 'gpt35_chat'
-            elif chat_model == 'gpt-4o':
-                chat_model = 'gpt4o_chat'
-            elif chat_model == 'gpt-4o-mini':
-                chat_model = 'o4_chat'
-            elif chat_model == 'gpt-4':
-                chat_model = 'gpt4_chat'
+        chat_provider, chat_model = self._chat_provider_model_for_requests()
         
         return {
             'prompt': user_prompt,
@@ -7396,7 +8107,6 @@ class ContextParser:
         if aggregated_content_tags:
             _append_unique_normalized(unique_content_tags, aggregated_content_tags)
         if merged_content:
-            self.logger.debug(f"｜｜｜merged_content｜｜｜\n{merged_content[:200]}")
             # 使用 _extract_content_keywords 從合併後的內容提取關鍵詞作為 content_tags
             extracted_content_keywords = self._extract_content_keywords(merged_content)
             if extracted_content_keywords:
@@ -7778,11 +8488,12 @@ class ContextParser:
             base_url = textprocessor_config.get('base_url', 'http://10.1.3.127:6017')
             
             # 準備請求
+            tp_provider, tp_model = self._chat_provider_model_for_requests()
             payload = {
                 "text": text,
                 "llm_config": {
-                    "provider": textprocessor_config.get('chat_provider', 'remote'),
-                    "model": textprocessor_config.get('chat_model', 'remote8b'),
+                    "provider": tp_provider,
+                    "model": tp_model,
                     "max_new_tokens": 500,
                     "temperature": 0.3
                 },

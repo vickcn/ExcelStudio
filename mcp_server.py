@@ -10,13 +10,13 @@ excel_mcp_server.py
     pip install "mcp[cli]" httpx
 
 啟動服務:
-    python excel_mcp_server.py
-    python excel_mcp_server.py --api-base http://10.1.3.127:7018 --transport stdio
-    python excel_mcp_server.py --api-base http://10.1.3.127:7018 --transport streamable-http --host 10.1.3.127 --port 7019
+    python mcp_server.py
+    python mcp_server.py --api-base http://10.1.3.127:6330 --transport stdio
+    python mcp_server.py --api-base http://10.1.3.127:6330 --transport streamable-http --host 10.1.3.127 --port 7019
 
 使用:
 1. 先啟動 api_server.py（FastAPI ExcelStudio API server）
-       uvicorn api_server:app --host 10.1.3.127 --port 7018
+       uvicorn api_server:app --host 10.1.3.127 --port 6330
 2. 再啟動本 MCP server（對接 FastAPI backend）
 3. Excel 相關工具會透過 /api/xlsx/command 呼叫 XlsxStdioServer
 """
@@ -24,14 +24,30 @@ excel_mcp_server.py
 from __future__ import annotations
 
 import argparse
+import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 
 
-DEFAULT_API_BASE = os.getenv("EXCEL_API_BASE", "http://10.1.3.127:7018")
+def _default_api_base() -> str:
+    env_base = os.getenv("EXCEL_API_BASE")
+    if env_base:
+        return env_base.rstrip("/")
+    cfg_path = Path(__file__).resolve().parent / "config.json"
+    try:
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        host = cfg.get("api_host", "10.1.3.127")
+        port = cfg.get("api_port", 6330)
+        return f"http://{host}:{port}"
+    except Exception:
+        return "http://10.1.3.127:6330"
+
+
+DEFAULT_API_BASE = _default_api_base()
 DEFAULT_TIMEOUT = float(os.getenv("EXCEL_API_TIMEOUT", "180"))
 
 mcp = FastMCP(
@@ -979,7 +995,7 @@ def main() -> None:
     parser.add_argument(
         "--api-base",
         default=DEFAULT_API_BASE,
-        help="ExcelStudio API base URL，例如 http://10.1.3.127:7018",
+        help="ExcelStudio API base URL，例如 http://10.1.3.127:6330",
     )
     parser.add_argument(
         "--timeout",

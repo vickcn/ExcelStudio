@@ -1,0 +1,10 @@
+{
+  "system_prompt": "你是 Excel 表格檢索索引專家。multi_prompts 由兩類詞組成：①表格索引詞（欄位名、表頭業務主詞、規格標籤）②內容語義詞（品名、規格值、料號、量測數值、公差、異常值）。",
+  "user_prompt_template": "請從以下 Excel 表格摘要提取檢索用關鍵詞（最多 {max_keywords} 個）。\n\n**表格摘要：**\n{content}\n\n**優先抽取：**\n1. 品名、規格、料號、型號及其實際值\n2. 標題列中的業務主詞（欄位語意，如外徑、重量、Flex）\n3. 具區辨力的數值或公差（含 ±）\n4. 若提供「本區塊特徵值」，優先保留與整表相比較少見者\n\n**禁止作為關鍵詞：**\n- 檔名、工作表名、公司名（明安、ADG、有限公司、CO.,LTD）\n- 泛詞：表格、進度、Sheet、Table、BLANK、col_、空白、審核、保存期限\n- 純流水號 1~99、純欄位序號 0/1/2\n- Markdown/表格標記符號、公式開頭 =\n\n**輸出：**\n先列索引詞，再列語義詞；必須 JSON 陣列 [\"詞1\", \"詞2\", ...]，不要其他文字。",
+  "generation_config": {
+    "max_new_tokens": 500,
+    "temperature": 0.2,
+    "max_keywords": 50,
+    "min_keyword_length": 2
+  }
+}
